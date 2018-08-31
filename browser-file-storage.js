@@ -22,7 +22,7 @@
 
     const IDB = {
         NAME: "BROWSER_FILE_STORAGE_JS",
-        CURRENT_VERSION: 3,
+        CURRENT_VERSION: 2,
     }
 
 
@@ -35,6 +35,7 @@
             this._init = false
             this._idb  = null
             this._db   = null
+            this._namespace = null
             this._logLevel = LOGGER.DEFAULT_LEVEL
 
             this._idb = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB
@@ -67,12 +68,14 @@
         }
 
 
-        init ({onSuccess, onFail}) {
+        init ({namespace, onSuccess, onFail}) {
+            this._namespace = namespace
+            let dbName = (namespace && typeof namespace === 'string') ? IDB.NAME + '_' + namespace : IDB.NAME 
             if(!this._idb) {
                 this._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_SUPPORTED, {})
                 onFail(MESSAGES.IDB_NOT_SUPPORTED, {})
             } else {
-                this._opendb(IDB.NAME, (err, attachedInnerObject) => {
+                this._opendb(dbName, (err, attachedInnerObject) => {
                     if(err) {
                         this._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_COULD_NOT_OPEN, {err : err})
                         onFail(MESSAGES.IDB_COULD_NOT_OPEN, {err : err})
