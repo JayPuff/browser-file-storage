@@ -1,0 +1,30 @@
+{
+  "name": "browser-file-storage",
+  "version": "1.0.0",
+  "description": "Abstracts the complexity of indexed DB so that a user can easily save files/blobs by key/filename on the browser",
+  "main": "index.js",
+  "scripts": {
+    "build": ""
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JayPuff/browser-file-storage.git"
+  },
+  "keywords": [
+    "browser",
+    "file",
+    "storage",
+    "store",
+    "browser storage",
+    "file storage",
+    "browser file storage",
+    "browser save file",
+    "browser store file"
+  ],
+  "author": "Nicolas Correa",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/JayPuff/browser-file-storage/issues"
+  },
+  "homepage": "https://github.com/JayPuff/browser-file-storage#readme"
+}
