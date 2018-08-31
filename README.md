@@ -20,5 +20,16 @@ Importing through script tag
 
 
 # Usage
+```javascript
+import browserFileStorage from 'browser-file-storage'
 
-Coming soon.
+browserFileStorage.init({
+    namespace: 'my_amazing_app',
+    onSuccess: (message, context) => {
+        console.log('onSuccess - ', message, context)
+    },
+    onFail: (error, context) => {
+        console.error('onFail - ', error, context)
+    }
+})
+```

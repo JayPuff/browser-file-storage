@@ -5,10 +5,15 @@
 
     const MESSAGES = {
         IDB_NOT_SUPPORTED: "Indexed DB is not supported on this browser.",
-
+        IDB_NOT_INIT: "Indexed DB was not initialized. Could not call method.",
+        IDB_ALREADY_INIT: "Indexed DB was already initialized.",
         IDB_OPEN_SUCCESS: "Indexed DB Opened successfully.",
-
         IDB_WILL_UPGRADE: "About to upgrade inner database structure.",
+        
+
+        IDB_PERSIST_PASS: "Asked for persistency and succeeded. Files will remain until user manually clears them.",
+        IDB_PERSIST_FAIL: "Asked for persistency and failed. Files have default persistency, browser could remove them.",
+        IDB_PERSIST_NONE: "Could not ask for persistency. Files have default persistency, browser could remove them.",
     }
 
     const LOGGER = {
@@ -69,6 +74,12 @@
 
 
         init ({namespace, onSuccess, onFail}) {
+            if(this._init) {
+                this._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_ALREADY_INIT, {})
+                onFail(MESSAGES.IDB_ALREADY_INIT, {})
+                return
+            }
+
             this._namespace = namespace
             let dbName = (namespace && typeof namespace === 'string') ? IDB.NAME + '_' + namespace : IDB.NAME 
             if(!this._idb) {
@@ -138,6 +149,31 @@
                 storeCreateIndex(filesStore, 'name', { unique: false } )
                 storeCreateIndex(filesStore, 'modified', { unique: false } )
             };
+        }
+
+
+        persist({onSuccess, onFail}) {
+            if(!this._init) {
+                this._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'persist'})
+                onFail(MESSAGES.IDB_NOT_INIT, {method: 'persist'})
+                return
+            }
+
+            // Can also call perisisted() Promise to see current mode.
+            if (navigator.storage && navigator.storage.persist) {
+                navigator.storage.persist().then( persistent => {
+                    if (persistent) {
+                        this._log(LOGGER.LEVEL_INFO, MESSAGES.IDB_PERSIST_PASS, {})
+                        onSuccess(MESSAGES.IDB_PERSIST_PASS, {})
+                    } else {
+                        this._log(LOGGER.LEVEL_WARN, MESSAGES.IDB_PERSIST_FAIL, {})
+                        onFail(MESSAGES.IDB_PERSIST_FAIL, {})
+                    }
+                });
+            } else {
+                this._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_PERSIST_NONE, {})
+                onFail(MESSAGES.IDB_PERSIST_NONE, {})
+            }
         }
 
     }
