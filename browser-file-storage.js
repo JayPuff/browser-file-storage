@@ -14,6 +14,10 @@
         IDB_PERSIST_PASS: "Asked for persistency and succeeded. Files will remain until user manually clears them.",
         IDB_PERSIST_FAIL: "Asked for persistency and failed. Files have default persistency, browser could remove them.",
         IDB_PERSIST_NONE: "Could not ask for persistency. Files have default persistency, browser could remove them.",
+
+
+        IDB_BAD_FILENAME: "Filename is not a string, or is empty.",
+        IDB_NO_CONTENT: "No Content specified.",
     }
 
     const LOGGER = {
@@ -134,7 +138,7 @@
                 }
     
     
-                let filesStore, sequenceStore
+                let filesStore
                 if(event.oldVersion != 0 && event.oldVersion != event.newVersion) {
                     updateVersions.old = event.oldVersion
                     updateVersions.new = event.newVersion
@@ -152,7 +156,7 @@
         }
 
 
-        persist({onSuccess, onFail}) {
+        persist ({onSuccess, onFail}) {
             if(!this._init) {
                 this._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'persist'})
                 onFail(MESSAGES.IDB_NOT_INIT, {method: 'persist'})
@@ -173,6 +177,50 @@
             } else {
                 this._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_PERSIST_NONE, {})
                 onFail(MESSAGES.IDB_PERSIST_NONE, {})
+            }
+        }
+
+        // Force the mode?
+        // Auto detect if possible
+        // mime types? can extract ext name from filename and map it to list of mime types.
+        // Does this overwrite by default? probably.
+        // base 64???
+        // blob
+        // fileupload
+        // raw binary... string???
+        save ({filename, content, onSuccess, onFail}) {
+            if(!this._init) {
+                this._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'save'})
+                onFail(MESSAGES.IDB_NOT_INIT, {method: 'save'})
+                return
+            }
+
+            if(!filename || typeof filename !== 'string' || filename.length < 1) {
+                this._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_BAD_FILENAME, {filename: filename})
+                onFail(MESSAGES.IDB_BAD_FILENAME, {filename: filename})
+                return
+            }
+
+            if(!content) {
+                this._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NO_CONTENT, {content: content})
+                onFail(MESSAGES.IDB_NO_CONTENT, {content: content})
+                return
+            }
+            
+            let ext = null
+            let contentMode = null
+
+            if(filename.indexOf('.') != -1) {
+                ext = filename.split('.').pop()
+                if(ext.length <= 2) { // ???
+                    ext = null
+                }
+            }
+
+            if(typeof content === 'string') {
+                contentMode = 'string'
+            } else if (content instanceof Blob) {
+                contentMode = 'blob'
             }
         }
 

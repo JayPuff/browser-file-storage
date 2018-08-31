@@ -1,1 +1,7 @@
-@TODO: Everything.
+upgrade needed function ... just copies the old store?
+I guess it depends on upgrade and we might want to do different things depending on version...
+
+promisify? // seems like lots of callbacks... could help.
+
+
+
