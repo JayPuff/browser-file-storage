@@ -34,6 +34,10 @@
         CURRENT_VERSION: 2,
     }
 
+    const MIMETYPES = {
+        'json': 'application/json',
+    }
+
 
     // *************************** //
     // **** CLASS DECLARATION **** //
@@ -188,7 +192,7 @@
         // blob
         // fileupload
         // raw binary... string???
-        save ({filename, content, onSuccess, onFail}) {
+        save ({filename, content, onSuccess, onFail, mimetype}) {
             if(!this._init) {
                 this._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'save'})
                 onFail(MESSAGES.IDB_NOT_INIT, {method: 'save'})
@@ -209,9 +213,10 @@
             
             let ext = null
             let contentMode = null
+            let newBlob = null
 
             if(filename.indexOf('.') != -1) {
-                ext = filename.split('.').pop()
+                ext = filename.split('.').pop().toLowerCase()
                 if(ext.length <= 2) { // ???
                     ext = null
                 }
@@ -221,6 +226,23 @@
                 contentMode = 'string'
             } else if (content instanceof Blob) {
                 contentMode = 'blob'
+            }
+
+            if(contentMode == 'string') {
+                if(!mimetype) {
+                    if(ext) {
+                        let existingMime = MIMETYPES[ext]
+                        if(existingMime) {
+                            newBlob = new Blob([content], {type: existingMime})
+                        }
+                    } else {
+                        newBlob = new Blob([content])
+                    }
+                } else {
+                    newBlob = new Blob([content], {type: mimetype})
+                }
+            } else {
+
             }
         }
 
