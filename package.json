@@ -2,7 +2,7 @@
   "name": "browser-file-storage",
   "version": "1.0.0",
   "description": "Abstracts the complexity of indexed DB so that a user can easily save files/blobs by key/filename on the browser",
-  "main": "index.js",
+  "main": "browser-file-storage.js",
   "scripts": {
     "build": ""
   },
