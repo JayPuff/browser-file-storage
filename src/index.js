@@ -308,7 +308,6 @@ class BrowserFileStorage {
 
     }
 
-
     delete (params) {
         params = params || {}
         let onSuccess = params.onSuccess || EMPTY_FUNC
@@ -327,7 +326,7 @@ class BrowserFileStorage {
             return
         }
 
-        let transaction = this._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite")
+        let transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite")
         let objectStore = transaction.objectStore("files")
 
         let deleteRequest = objectStore.delete(filename)
@@ -355,7 +354,7 @@ class BrowserFileStorage {
             return
         }
 
-        let transaction = this._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite")
+        let transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite")
         let objectStore = transaction.objectStore("files")
 
         let clearRequest = objectStore.clear()
@@ -416,6 +415,17 @@ class BrowserFileStorage {
                 } else {
                     newBlob = contents
                 }
+            }
+        } else if (contents instanceof FileAbstraction) {
+            if(!givenMimeType) {
+                if(existingMime) {
+                    newBlob = new Blob([contents.blob], {type: existingMime})
+                } else {
+                    LOGGER.log(LOGGER.LEVEL_WARN, MESSAGES.NO_MIME_TYPE, {filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave'})
+                    newBlob = new Blob([contents.blob], {type: 'application/octet-stream'})
+                }
+            } else {
+                newBlob = new Blob([contents.blob], {type: givenMimeType})
             }
         } else {
             return null
