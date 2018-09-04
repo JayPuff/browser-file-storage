@@ -30,5 +30,8 @@ export default {
     IDB_DELETE_SUCCESS: "Successfully deleted a file from database.",
     IDB_DELETE_FAIL: "Failed at deleting file from database.",
 
+    IDB_DELETE_ALL_SUCCESS: "Successfully deleted all files from database.",
+    IDB_DELETE_ALL_FAIL: "Could not delete all files from the database.",
+
     NO_MIME_TYPE: "Cannot auto-detect mimetype for filename, setting mimetype to a safe default type",
 }

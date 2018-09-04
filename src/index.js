@@ -343,6 +343,34 @@ class BrowserFileStorage {
         }
     }
 
+
+    deleteAll (params) {
+        params = params || {}
+        let onSuccess = params.onSuccess || EMPTY_FUNC
+        let onFail = params.onFail || EMPTY_FUNC
+
+        if(!SELF._init) {
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'delete'})
+            onFail({message: MESSAGES.IDB_NOT_INIT})
+            return
+        }
+
+        let transaction = this._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite")
+        let objectStore = transaction.objectStore("files")
+
+        let clearRequest = objectStore.clear()
+
+        transaction.oncomplete = function(event) {
+            LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_DELETE_ALL_SUCCESS, {event: event, request: clearRequest})
+            onSuccess({message: MESSAGES.IDB_DELETE_ALL_SUCCESS, event: event, request: clearRequest})
+        };
+    
+        transaction.onerror = function(event) {
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_DELETE_ALL_FAIL, {error: transaction.error, event: event, request: clearRequest})
+            onFail({message: MESSAGES.IDB_DELETE_ALL_FAIL, error: transaction.error, event: event, request: clearRequest})
+        };
+    }
+
     // Return a File Abstraction
     _createFileToSave ({filename, contents, mimeType}) {
         if(!mimeType || typeof mimeType !== 'string' || mimeType == '') {
