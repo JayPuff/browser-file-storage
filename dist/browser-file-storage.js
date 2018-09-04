@@ -153,11 +153,6 @@ var BrowserFileStorage = function () {
             _logger2.default.logLevel(level);
         }
     }, {
-        key: '_log',
-        value: function _log(level, message, attachedObject) {
-            _logger2.default.log(level, message, attachedObject);
-        }
-    }, {
         key: 'init',
         value: function init(params) {
             params = params || {};
@@ -166,7 +161,7 @@ var BrowserFileStorage = function () {
             var onFail = params.onFail || EMPTY_FUNC;
 
             if (SELF._init) {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_ALREADY_INIT, {});
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_ALREADY_INIT, {});
                 onFail({ message: _messages2.default.IDB_ALREADY_INIT, supported: true });
                 return;
             }
@@ -174,17 +169,17 @@ var BrowserFileStorage = function () {
             SELF._namespace = namespace;
             var dbName = namespace && typeof namespace === 'string' ? SELF._idb_name + '_' + namespace : SELF._idb_name;
             if (!SELF._idb) {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_SUPPORTED, {});
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_SUPPORTED, {});
                 onFail({ message: _messages2.default.IDB_NOT_SUPPORTED, supported: false });
             } else {
                 SELF._opendb(dbName, function (err, successObj) {
                     if (err) {
-                        SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_COULD_NOT_OPEN, { err: err });
+                        _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_COULD_NOT_OPEN, { err: err });
                         onFail({ message: _messages2.default.IDB_COULD_NOT_OPEN, error: err.error, supported: true });
                         return;
                     }
 
-                    SELF._log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_OPEN_SUCCESS, successObj || {});
+                    _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_OPEN_SUCCESS, successObj || {});
                     SELF._init = true;
                     onSuccess({ message: _messages2.default.IDB_OPEN_SUCCESS, supported: true, initial: successObj.initial, upgrade: successObj.upgrade, versions: successObj.versions });
                 }, SELF._idb_version);
@@ -193,16 +188,14 @@ var BrowserFileStorage = function () {
     }, {
         key: '_opendb',
         value: function _opendb(name, callback, version) {
-            var _this = this;
-
             var request = null;
             var upgrade = false;
             var initial = false;
             var updateVersions = { old: null, new: null };
             if (version) {
-                request = this._idb.open(name, version);
+                request = SELF._idb.open(name, version);
             } else {
-                request = this._idb.open(name);
+                request = SELF._idb.open(name);
             }
 
             request.onerror = function (event) {
@@ -210,15 +203,15 @@ var BrowserFileStorage = function () {
             };
 
             request.onsuccess = function (event) {
-                _this._db = request.result;
+                SELF._db = request.result;
                 callback(null, { db: request.result, request: request, event: event, upgrade: upgrade, initial: initial, versions: updateVersions });
             };
 
             request.onupgradeneeded = function (event) {
                 upgrade = true;
-                _this._log(_logger2.default.LEVEL_WARN, _messages2.default.IDB_WILL_UPGRADE, {});
+                _logger2.default.log(_logger2.default.LEVEL_WARN, _messages2.default.IDB_WILL_UPGRADE, {});
 
-                _this._db = event.target.result;
+                SELF._db = event.target.result;
                 var transaction = event.target.transaction;
 
                 function storeCreateIndex(objectStore, name, options) {
@@ -236,7 +229,7 @@ var BrowserFileStorage = function () {
                 } else {
                     // First time initializing DB
                     initial = true;
-                    filesStore = _this._db.createObjectStore("files", { keyPath: "filename" });
+                    filesStore = SELF._db.createObjectStore("files", { keyPath: "filename" });
                 }
 
                 storeCreateIndex(filesStore, 'filename', { unique: false });
@@ -251,7 +244,7 @@ var BrowserFileStorage = function () {
             var onFail = params.onFail || EMPTY_FUNC;
 
             if (!SELF._init) {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'persist' });
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'persist' });
                 onFail({ message: _messages2.default.IDB_NOT_INIT, method: 'persist' });
                 return;
             }
@@ -260,15 +253,15 @@ var BrowserFileStorage = function () {
             if (navigator.storage && navigator.storage.persist) {
                 navigator.storage.persist().then(function (persistent) {
                     if (persistent) {
-                        SELF._log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_PERSIST_PASS, {});
+                        _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_PERSIST_PASS, {});
                         onSuccess({ message: _messages2.default.IDB_PERSIST_PASS, persistent: true });
                     } else {
-                        SELF._log(_logger2.default.LEVEL_WARN, _messages2.default.IDB_PERSIST_FAIL, {});
+                        _logger2.default.log(_logger2.default.LEVEL_WARN, _messages2.default.IDB_PERSIST_FAIL, {});
                         onFail({ message: _messages2.default.IDB_PERSIST_FAIL, canPersist: true });
                     }
                 });
             } else {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_PERSIST_NONE, {});
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_PERSIST_NONE, {});
                 onFail({ message: _messages2.default.IDB_PERSIST_NONE, canPersist: false });
             }
         }
@@ -294,19 +287,19 @@ var BrowserFileStorage = function () {
 
             // Validation and Blob Creation.
             if (!SELF._init) {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'save' });
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'save' });
                 onFail({ message: _messages2.default.IDB_NOT_INIT });
                 return;
             }
 
             if (!filename || typeof filename !== 'string' || filename.length < 1) {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_BAD_FILENAME, { errors: { filename: true } });
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_BAD_FILENAME, { errors: { filename: true } });
                 onFail({ message: _messages2.default.IDB_BAD_FILENAME, errors: { filename: true } });
                 return;
             }
 
             if (!contents) {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NO_CONTENT, { errors: { filename: false, contents: true } });
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NO_CONTENT, { errors: { filename: false, contents: true } });
                 onFail({ message: _messages2.default.IDB_NO_CONTENT, errors: { filename: false, contents: true } });
                 return;
             }
@@ -314,7 +307,7 @@ var BrowserFileStorage = function () {
             var fileToSave = SELF._createFileToSave({ filename: filename, contents: contents, mimeType: mimeType });
 
             if (!fileToSave) {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_WRONG_CONTENT, { errors: { filename: false, contents: true, parseToBlob: true } });
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_WRONG_CONTENT, { errors: { filename: false, contents: true, parseToBlob: true } });
                 onFail({ message: _messages2.default.IDB_WRONG_CONTENT, errors: { filename: false, contents: true, parseToBlob: true } });
                 return;
             }
@@ -326,12 +319,12 @@ var BrowserFileStorage = function () {
             var addRequest = objectStore.put(fileToSave._toIDB());
 
             addRequest.onsuccess = function (event) {
-                SELF._log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_SAVE_SUCCESS, { event: event });
+                _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_SAVE_SUCCESS, { event: event });
                 onSuccess({ message: _messages2.default.IDB_SAVE_SUCCESS, event: event });
             };
 
             addRequest.onerror = function (event) {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_SAVE_FAIL, { event: event });
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_SAVE_FAIL, { event: event });
                 onFail({ message: _messages2.default.IDB_SAVE_FAIL, event: event, errors: { db: true } });
             };
         }
@@ -347,13 +340,13 @@ var BrowserFileStorage = function () {
             var filename = params.filename;
 
             if (!SELF._init) {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'load' });
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'load' });
                 onFail({ message: _messages2.default.IDB_NOT_INIT });
                 return;
             }
 
             if (!filename || typeof filename !== 'string' || filename.length < 1) {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_BAD_FILENAME, { method: 'load', filename: filename });
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_BAD_FILENAME, { method: 'load', filename: filename });
                 onFail({ message: _messages2.default.IDB_BAD_FILENAME, errors: { filename: true } });
                 return;
             }
@@ -366,16 +359,16 @@ var BrowserFileStorage = function () {
                 // Do something with the request.result!
                 if (request.result) {
                     var fileToLoad = new _file2.default(request.result);
-                    SELF._log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_LOAD_SUCCESS, { file: fileToLoad, event: event, request: request });
+                    _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_LOAD_SUCCESS, { file: fileToLoad, event: event, request: request });
                     onSuccess(fileToLoad, { event: event, request: request });
                 } else {
-                    SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_FIND_FAIL, { event: event, request: request, errors: { notFound: true } });
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_FIND_FAIL, { event: event, request: request, errors: { notFound: true } });
                     onFail({ message: _messages2.default.IDB_LOAD_FIND_FAIL, event: event, request: request, errors: { notFound: true } });
                 }
             };
 
             request.onerror = function (event) {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_FAIL, { event: event, request: request, errors: { db: true } });
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_FAIL, { event: event, request: request, errors: { db: true } });
                 onFail({ message: _messages2.default.IDB_LOAD_FAIL, event: event, request: request, errors: { db: true } });
             };
         }
@@ -390,7 +383,7 @@ var BrowserFileStorage = function () {
             var onFail = params.onFail || EMPTY_FUNC;
 
             if (!SELF._init) {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'loadAll' });
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'loadAll' });
                 onFail({ message: _messages2.default.IDB_NOT_INIT });
                 return;
             }
@@ -456,13 +449,13 @@ var BrowserFileStorage = function () {
             var filename = params.filename;
 
             if (!SELF._init) {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'delete' });
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'delete' });
                 onFail({ message: _messages2.default.IDB_NOT_INIT });
                 return;
             }
 
             if (!filename || typeof filename !== 'string' || filename.length < 1) {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_BAD_FILENAME, { errors: { filename: true } });
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_BAD_FILENAME, { errors: { filename: true } });
                 onFail({ message: _messages2.default.IDB_BAD_FILENAME, errors: { filename: true } });
                 return;
             }
@@ -473,14 +466,13 @@ var BrowserFileStorage = function () {
             var deleteRequest = objectStore.delete(filename);
 
             transaction.oncomplete = function (event) {
-                console.log('DELETED!');
-                // SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'delete'})
-                // onFail({message: MESSAGES.IDB_NOT_INIT})
+                _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_DELETE_SUCCESS, { event: event, request: deleteRequest, transaction: transaction });
+                onSuccess({ message: _messages2.default.IDB_DELETE_SUCCESS, event: event, request: deleteRequest, transaction: transaction });
             };
 
             transaction.onerror = function (event) {
-                console.log('FAILED DELETED!');
-                // callback(new Error(transaction.error), event)
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_DELETE_FAIL, { error: transaction.error, event: event, request: deleteRequest });
+                onFail({ message: _messages2.default.IDB_DELETE_FAIL, error: transaction.error, event: event, request: deleteRequest });
             };
         }
 
@@ -508,11 +500,11 @@ var BrowserFileStorage = function () {
                         if (existingMime) {
                             newBlob = new Blob([contents], { type: existingMime });
                         } else {
-                            this._log(_logger2.default.LEVEL_WARN, _messages2.default.NO_MIME_TYPE, { filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave' });
+                            _logger2.default.log(_logger2.default.LEVEL_WARN, _messages2.default.NO_MIME_TYPE, { filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave' });
                             newBlob = new Blob([contents], { type: 'text/plain' });
                         }
                     } else {
-                        this._log(_logger2.default.LEVEL_WARN, _messages2.default.NO_MIME_TYPE, { filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave' });
+                        _logger2.default.log(_logger2.default.LEVEL_WARN, _messages2.default.NO_MIME_TYPE, { filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave' });
                         newBlob = new Blob([contents], { type: 'text/plain' });
                     }
                 } else {
@@ -524,7 +516,7 @@ var BrowserFileStorage = function () {
                         if (existingMime) {
                             newBlob = new Blob([contents], { type: existingMime });
                         } else {
-                            this._log(_logger2.default.LEVEL_WARN, _messages2.default.NO_MIME_TYPE, { filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave' });
+                            _logger2.default.log(_logger2.default.LEVEL_WARN, _messages2.default.NO_MIME_TYPE, { filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave' });
                             newBlob = new Blob([contents], { type: 'application/octet-stream' });
                         }
                     } else {

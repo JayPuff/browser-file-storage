@@ -28,11 +28,6 @@ class BrowserFileStorage {
         LOGGER.logLevel(level)
     }
 
-    _log (level, message, attachedObject) {
-        LOGGER.log(level, message, attachedObject)
-    }
-
-
     init (params) {
         params = params || {}
         let namespace = params.namespace
@@ -40,7 +35,7 @@ class BrowserFileStorage {
         let onFail = params.onFail || EMPTY_FUNC
 
         if(SELF._init) {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_ALREADY_INIT, {})
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_ALREADY_INIT, {})
             onFail({message: MESSAGES.IDB_ALREADY_INIT, supported: true})
             return
         }
@@ -48,17 +43,17 @@ class BrowserFileStorage {
         SELF._namespace = namespace
         let dbName = (namespace && typeof namespace === 'string') ? SELF._idb_name + '_' + namespace : SELF._idb_name 
         if(!SELF._idb) {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_SUPPORTED, {})
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_SUPPORTED, {})
             onFail({message: MESSAGES.IDB_NOT_SUPPORTED, supported: false})
         } else {
             SELF._opendb(dbName, (err, successObj) => {
                 if(err) {
-                    SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_COULD_NOT_OPEN, {err : err})
+                    LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_COULD_NOT_OPEN, {err : err})
                     onFail({message: MESSAGES.IDB_COULD_NOT_OPEN, error: err.error, supported: true})
                     return
                 }
 
-                SELF._log(LOGGER.LEVEL_INFO, MESSAGES.IDB_OPEN_SUCCESS, successObj || {})
+                LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_OPEN_SUCCESS, successObj || {})
                 SELF._init = true
                 onSuccess({message: MESSAGES.IDB_OPEN_SUCCESS, supported: true, initial: successObj.initial, upgrade: successObj.upgrade, versions: successObj.versions})
             }, SELF._idb_version)
@@ -71,9 +66,9 @@ class BrowserFileStorage {
         let initial = false
         let updateVersions = {old: null, new: null} 
         if(version) {
-            request = this._idb.open(name, version)
+            request = SELF._idb.open(name, version)
         } else {
-            request = this._idb.open(name)
+            request = SELF._idb.open(name)
         }
 
         request.onerror = (event) => {
@@ -81,15 +76,15 @@ class BrowserFileStorage {
         }
 
         request.onsuccess = (event) => {
-            this._db = request.result
+            SELF._db = request.result
             callback(null, { db: request.result, request: request, event: event, upgrade: upgrade, initial: initial, versions: updateVersions })
         };
 
         request.onupgradeneeded = (event) => {
             upgrade = true
-            this._log(LOGGER.LEVEL_WARN, MESSAGES.IDB_WILL_UPGRADE, {})
+            LOGGER.log(LOGGER.LEVEL_WARN, MESSAGES.IDB_WILL_UPGRADE, {})
 
-            this._db = event.target.result
+            SELF._db = event.target.result
             let transaction = event.target.transaction
 
             function storeCreateIndex (objectStore, name, options) {
@@ -108,7 +103,7 @@ class BrowserFileStorage {
             } else {
                 // First time initializing DB
                 initial = true
-                filesStore = this._db.createObjectStore("files", { keyPath: "filename" })
+                filesStore = SELF._db.createObjectStore("files", { keyPath: "filename" })
             }
             
             storeCreateIndex(filesStore, 'filename', { unique: false } )
@@ -123,7 +118,7 @@ class BrowserFileStorage {
         let onFail = params.onFail || EMPTY_FUNC
 
         if(!SELF._init) {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'persist'})
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'persist'})
             onFail({message: MESSAGES.IDB_NOT_INIT, method: 'persist'})
             return
         }
@@ -132,15 +127,15 @@ class BrowserFileStorage {
         if (navigator.storage && navigator.storage.persist) {
             navigator.storage.persist().then( persistent => {
                 if (persistent) {
-                    SELF._log(LOGGER.LEVEL_INFO, MESSAGES.IDB_PERSIST_PASS, {})
+                    LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_PERSIST_PASS, {})
                     onSuccess({message: MESSAGES.IDB_PERSIST_PASS, persistent: true})
                 } else {
-                    SELF._log(LOGGER.LEVEL_WARN, MESSAGES.IDB_PERSIST_FAIL, {})
+                    LOGGER.log(LOGGER.LEVEL_WARN, MESSAGES.IDB_PERSIST_FAIL, {})
                     onFail({message: MESSAGES.IDB_PERSIST_FAIL, canPersist: true})
                 }
             });
         } else {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_PERSIST_NONE, {})
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_PERSIST_NONE, {})
             onFail({message: MESSAGES.IDB_PERSIST_NONE, canPersist: false})
         }
     }
@@ -163,19 +158,19 @@ class BrowserFileStorage {
 
         // Validation and Blob Creation.
         if(!SELF._init) {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'save'})
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'save'})
             onFail({message: MESSAGES.IDB_NOT_INIT})
             return
         }
 
         if(!filename || typeof filename !== 'string' || filename.length < 1) {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_BAD_FILENAME, {errors: { filename: true }})
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_BAD_FILENAME, {errors: { filename: true }})
             onFail({message: MESSAGES.IDB_BAD_FILENAME, errors: { filename: true } })
             return
         }
 
         if(!contents) {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NO_CONTENT, {errors: { filename: false, contents: true }})
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NO_CONTENT, {errors: { filename: false, contents: true }})
             onFail({message: MESSAGES.IDB_NO_CONTENT, errors: { filename: false, contents: true } })
             return
         }
@@ -183,7 +178,7 @@ class BrowserFileStorage {
         let fileToSave = SELF._createFileToSave({filename:filename,contents:contents,mimeType:mimeType})
 
         if(!fileToSave) {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_WRONG_CONTENT, {errors: { filename: false, contents: true, parseToBlob: true }})
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_WRONG_CONTENT, {errors: { filename: false, contents: true, parseToBlob: true }})
             onFail({message: MESSAGES.IDB_WRONG_CONTENT, errors: { filename: false, contents: true, parseToBlob: true } })
             return
         } 
@@ -195,12 +190,12 @@ class BrowserFileStorage {
         let addRequest = objectStore.put(fileToSave._toIDB())
 
         addRequest.onsuccess = (event) => {
-            SELF._log(LOGGER.LEVEL_INFO, MESSAGES.IDB_SAVE_SUCCESS, {event: event})
+            LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_SAVE_SUCCESS, {event: event})
             onSuccess({message: MESSAGES.IDB_SAVE_SUCCESS, event: event })
         }
 
         addRequest.onerror = (event) => {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_SAVE_FAIL, {event: event})
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_SAVE_FAIL, {event: event})
             onFail({message: MESSAGES.IDB_SAVE_FAIL, event: event, errors: { db: true }})
         }
 
@@ -214,13 +209,13 @@ class BrowserFileStorage {
         let filename = params.filename
 
         if(!SELF._init) {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'load'})
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'load'})
             onFail({message: MESSAGES.IDB_NOT_INIT})
             return
         }
 
         if(!filename || typeof filename !== 'string' || filename.length < 1) {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_BAD_FILENAME, {method: 'load', filename: filename})
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_BAD_FILENAME, {method: 'load', filename: filename})
             onFail({message: MESSAGES.IDB_BAD_FILENAME, errors: {filename: true} })
             return
         }
@@ -233,16 +228,16 @@ class BrowserFileStorage {
             // Do something with the request.result!
             if(request.result) {
                 let fileToLoad = new FileAbstraction(request.result)
-                SELF._log(LOGGER.LEVEL_INFO, MESSAGES.IDB_LOAD_SUCCESS, {file: fileToLoad, event: event, request: request})
+                LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_LOAD_SUCCESS, {file: fileToLoad, event: event, request: request})
                 onSuccess(fileToLoad, {event: event, request: request})
             } else {
-                SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_FIND_FAIL, {event: event, request: request, errors: {notFound: true} })
+                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_FIND_FAIL, {event: event, request: request, errors: {notFound: true} })
                 onFail({message: MESSAGES.IDB_LOAD_FIND_FAIL, event: event, request: request, errors: {notFound: true} })
             }
         }
 
         request.onerror = (event) => {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_FAIL, {event: event, request: request, errors: {db: true}})
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_FAIL, {event: event, request: request, errors: {db: true}})
             onFail({message: MESSAGES.IDB_LOAD_FAIL, event: event, request: request, errors: {db: true}})
         }
     }
@@ -254,7 +249,7 @@ class BrowserFileStorage {
         let onFail = params.onFail || EMPTY_FUNC
 
         if(!SELF._init) {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'loadAll'})
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'loadAll'})
             onFail({message: MESSAGES.IDB_NOT_INIT})
             return
         }
@@ -321,13 +316,13 @@ class BrowserFileStorage {
         let filename = params.filename
 
         if(!SELF._init) {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'delete'})
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'delete'})
             onFail({message: MESSAGES.IDB_NOT_INIT})
             return
         }
 
         if(!filename || typeof filename !== 'string' || filename.length < 1) {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_BAD_FILENAME, {errors: { filename: true }})
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_BAD_FILENAME, {errors: { filename: true }})
             onFail({message: MESSAGES.IDB_BAD_FILENAME, errors: { filename: true } })
             return
         }
@@ -338,14 +333,13 @@ class BrowserFileStorage {
         let deleteRequest = objectStore.delete(filename)
 
         transaction.oncomplete = function(event) {
-            console.log('DELETED!')
-            // SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'delete'})
-            // onFail({message: MESSAGES.IDB_NOT_INIT})
+            LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_DELETE_SUCCESS, {event: event, request: deleteRequest, transaction: transaction})
+            onSuccess({message: MESSAGES.IDB_DELETE_SUCCESS, event: event, request: deleteRequest, transaction: transaction})
         }
     
         transaction.onerror = function(event) {
-            console.log('FAILED DELETED!')
-            // callback(new Error(transaction.error), event)
+            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_DELETE_FAIL, {error: transaction.error, event: event, request: deleteRequest})
+            onFail({message: MESSAGES.IDB_DELETE_FAIL, error: transaction.error, event: event, request: deleteRequest})
         }
     }
 
@@ -366,11 +360,11 @@ class BrowserFileStorage {
                     if(existingMime) {
                         newBlob = new Blob([contents], {type: existingMime})
                     } else {
-                        this._log(LOGGER.LEVEL_WARN, MESSAGES.NO_MIME_TYPE, {filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave'})
+                        LOGGER.log(LOGGER.LEVEL_WARN, MESSAGES.NO_MIME_TYPE, {filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave'})
                         newBlob = new Blob([contents], {type: 'text/plain'})
                     }
                 } else {
-                    this._log(LOGGER.LEVEL_WARN, MESSAGES.NO_MIME_TYPE, {filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave'})
+                    LOGGER.log(LOGGER.LEVEL_WARN, MESSAGES.NO_MIME_TYPE, {filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave'})
                     newBlob = new Blob([contents], {type: 'text/plain'})
                 }
             } else {
@@ -382,7 +376,7 @@ class BrowserFileStorage {
                     if(existingMime) {
                         newBlob = new Blob([contents], {type: existingMime})
                     } else {
-                        this._log(LOGGER.LEVEL_WARN, MESSAGES.NO_MIME_TYPE, {filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave'})
+                        LOGGER.log(LOGGER.LEVEL_WARN, MESSAGES.NO_MIME_TYPE, {filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave'})
                         newBlob = new Blob([contents], {type: 'application/octet-stream'})
                     }
                 } else {
