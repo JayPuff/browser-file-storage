@@ -405,10 +405,14 @@ var BrowserFileStorage = function () {
                 getRequest.onsuccess = function (event) {
                     var files = [];
                     if (!event.target.result[0]) {
-                        files.push(new _file2.default(event.target.result));
+                        if (event.target.result && event.target.result.filename) {
+                            files.push(new _file2.default(event.target.result));
+                        }
                     } else {
                         for (var r in event.target.result) {
-                            files.push(new _file2.default(event.target.result[r]));
+                            if (event.target.result[r] && event.target.result[r].filename) {
+                                files.push(new _file2.default(event.target.result[r]));
+                            }
                         }
                     }
                     _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_LOAD_ALL_SUCCESS, { files: files, event: event, request: getRequest });
@@ -419,26 +423,65 @@ var BrowserFileStorage = function () {
                     _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_ALL_FAIL, { event: event, request: getRequest, errors: { db: true } });
                     onFail({ message: _messages2.default.IDB_LOAD_ALL_FAIL, event: event, request: getRequest, errors: { db: true } });
                 };
+            } else {
+                // Fallback to the traditional cursor approach if getAll isn't supported.
+                var files = [];
+                var cursorRequest = objectStore.openCursor();
+
+                cursorRequest.onsuccess = function (event) {
+                    var cursor = event.target.result;
+                    if (cursor) {
+                        if (cursor.value && cursor.value.filename) {
+                            files.push(new _file2.default(cursor.value));
+                        }
+                        cursor.continue();
+                    } else {
+                        _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_LOAD_ALL_SUCCESS, { files: files, event: event, request: cursorRequest });
+                        onSuccess(files, { message: _messages2.default.IDB_LOAD_ALL_SUCCESS, event: event, request: cursorRequest });
+                    }
+                };
+
+                cursorRequest.onerror = function (event) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_ALL_FAIL, { event: event, request: cursorRequest, errors: { db: true } });
+                    onFail({ message: _messages2.default.IDB_LOAD_ALL_FAIL, event: event, request: cursorRequest, errors: { db: true } });
+                };
             }
-            // } else {
-            //     // Fallback to the traditional cursor approach if getAll isn't supported.
-            //     let files = []
-            //     let cursorRequest = objectStore.openCursor()
+        }
+    }, {
+        key: 'delete',
+        value: function _delete(params) {
+            params = params || {};
+            var onSuccess = params.onSuccess || EMPTY_FUNC;
+            var onFail = params.onFail || EMPTY_FUNC;
+            var filename = params.filename;
 
-            //     cursorRequest.onsuccess = function(event) {
-            //         let cursor = event.target.result
-            //         if (cursor) {
-            //             files.push(cursor.value)
-            //             cursor.continue()
-            //         } else {
-            //             callback(null,files)
-            //         }
-            //     }
+            if (!SELF._init) {
+                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'delete' });
+                onFail({ message: _messages2.default.IDB_NOT_INIT });
+                return;
+            }
 
-            //     cursorRequest.onerror = function(event) {
-            //         callback(new Error('File Storage - getAllFiles - Cursor Mode - Unable to get all files'), event)
-            //     }
-            // }
+            if (!filename || typeof filename !== 'string' || filename.length < 1) {
+                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_BAD_FILENAME, { errors: { filename: true } });
+                onFail({ message: _messages2.default.IDB_BAD_FILENAME, errors: { filename: true } });
+                return;
+            }
+
+            var transaction = this._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite");
+            var objectStore = transaction.objectStore("files");
+
+            var deleteRequest = objectStore.delete(filename);
+
+            transaction.oncomplete = function (event) {
+                console.log('DELETED!');
+                // SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'delete'})
+                // onFail({message: MESSAGES.IDB_NOT_INIT})
+            };
+
+            transaction.onerror = function (event) {
+                console.log('FAILED DELETED!');
+                // callback(new Error(transaction.error), event)
+            };
         }
 
         // Return a File Abstraction

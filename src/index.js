@@ -269,10 +269,14 @@ class BrowserFileStorage {
             getRequest.onsuccess = function(event) {
                 let files = []
                 if(!event.target.result[0]) {
-                    files.push(new FileAbstraction(event.target.result))
+                    if(event.target.result && event.target.result.filename) {
+                        files.push(new FileAbstraction(event.target.result))
+                    }
                 } else {
                     for(let r in event.target.result) {
-                        files.push(new FileAbstraction(event.target.result[r]))
+                        if(event.target.result[r] && event.target.result[r].filename) {
+                            files.push(new FileAbstraction(event.target.result[r]))
+                        }
                     }
                 }
                 LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_LOAD_ALL_SUCCESS, {files: files, event: event, request: getRequest})
@@ -283,27 +287,66 @@ class BrowserFileStorage {
                 LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_ALL_FAIL, {event: event, request: getRequest, errors: {db: true}})
                 onFail({message: MESSAGES.IDB_LOAD_ALL_FAIL, event: event, request: getRequest, errors: {db: true}})
             }
-        }
-        // } else {
-        //     // Fallback to the traditional cursor approach if getAll isn't supported.
-        //     let files = []
-        //     let cursorRequest = objectStore.openCursor()
+        } else {
+            // Fallback to the traditional cursor approach if getAll isn't supported.
+            let files = []
+            let cursorRequest = objectStore.openCursor()
             
-        //     cursorRequest.onsuccess = function(event) {
-        //         let cursor = event.target.result
-        //         if (cursor) {
-        //             files.push(cursor.value)
-        //             cursor.continue()
-        //         } else {
-        //             callback(null,files)
-        //         }
-        //     }
+            cursorRequest.onsuccess = function(event) {
+                let cursor = event.target.result
+                if (cursor) {
+                    if(cursor.value && cursor.value.filename) {
+                        files.push(new FileAbstraction(cursor.value))
+                    }
+                    cursor.continue()
+                } else {
+                    LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_LOAD_ALL_SUCCESS, {files: files, event: event, request: cursorRequest})
+                    onSuccess(files, {message: MESSAGES.IDB_LOAD_ALL_SUCCESS, event: event, request: cursorRequest})
+                }
+            }
 
-        //     cursorRequest.onerror = function(event) {
-        //         callback(new Error('File Storage - getAllFiles - Cursor Mode - Unable to get all files'), event)
-        //     }
-        // }
+            cursorRequest.onerror = function(event) {
+                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_ALL_FAIL, {event: event, request: cursorRequest, errors: {db: true}})
+                onFail({message: MESSAGES.IDB_LOAD_ALL_FAIL, event: event, request: cursorRequest, errors: {db: true}})
+            }
+        }
 
+    }
+
+
+    delete (params) {
+        params = params || {}
+        let onSuccess = params.onSuccess || EMPTY_FUNC
+        let onFail = params.onFail || EMPTY_FUNC
+        let filename = params.filename
+
+        if(!SELF._init) {
+            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'delete'})
+            onFail({message: MESSAGES.IDB_NOT_INIT})
+            return
+        }
+
+        if(!filename || typeof filename !== 'string' || filename.length < 1) {
+            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_BAD_FILENAME, {errors: { filename: true }})
+            onFail({message: MESSAGES.IDB_BAD_FILENAME, errors: { filename: true } })
+            return
+        }
+
+        let transaction = this._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite")
+        let objectStore = transaction.objectStore("files")
+
+        let deleteRequest = objectStore.delete(filename)
+
+        transaction.oncomplete = function(event) {
+            console.log('DELETED!')
+            // SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'delete'})
+            // onFail({message: MESSAGES.IDB_NOT_INIT})
+        }
+    
+        transaction.onerror = function(event) {
+            console.log('FAILED DELETED!')
+            // callback(new Error(transaction.error), event)
+        }
     }
 
     // Return a File Abstraction
