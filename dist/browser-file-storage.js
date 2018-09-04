@@ -2,11 +2,11 @@
 	if(typeof exports === 'object' && typeof module === 'object')
 		module.exports = factory();
 	else if(typeof define === 'function' && define.amd)
-		define("browser-file-storage", [], factory);
-	else if(typeof exports === 'object')
-		exports["browser-file-storage"] = factory();
-	else
-		root["browser-file-storage"] = factory();
+		define([], factory);
+	else {
+		var a = factory();
+		for(var i in a) (typeof exports === 'object' ? exports : root)[i] = a[i];
+	}
 })(window, function() {
 return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
@@ -123,11 +123,6 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var IDB = {
-    NAME: "BROWSER_FILE_STORAGE_JS",
-    CURRENT_VERSION: 2
-};
-
 var SELF = null;
 
 // *************************** //
@@ -142,8 +137,7 @@ var BrowserFileStorage = function () {
         this._idb = null;
         this._db = null;
         this._namespace = null;
-
-        this._idb = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
+        this._idb_name = "BROWSER_FILE_STORAGE_JS", this._idb_version = 2, this._idb = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
         window.IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction || window.msIDBTransaction || { READ_WRITE: "readwrite" // This line should only be needed if it is needed to support the object's constants for older browsers
         };window.IDBKeyRange = window.IDBKeyRange || window.webkitIDBKeyRange || window.msIDBKeyRange;
     }
@@ -172,7 +166,7 @@ var BrowserFileStorage = function () {
             }
 
             SELF._namespace = namespace;
-            var dbName = namespace && typeof namespace === 'string' ? IDB.NAME + '_' + namespace : IDB.NAME;
+            var dbName = namespace && typeof namespace === 'string' ? SELF._idb_name + '_' + namespace : SELF._idb_name;
             if (!SELF._idb) {
                 SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_SUPPORTED, {});
                 onFail({ message: _messages2.default.IDB_NOT_SUPPORTED, supported: false });
@@ -187,7 +181,7 @@ var BrowserFileStorage = function () {
                     SELF._log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_OPEN_SUCCESS, successObj || {});
                     SELF._init = true;
                     onSuccess({ message: _messages2.default.IDB_OPEN_SUCCESS, supported: true, initial: successObj.initial, upgrade: successObj.upgrade, versions: successObj.versions });
-                }, IDB.CURRENT_VERSION);
+                }, SELF._idb_version);
             }
         }
     }, {

@@ -5,9 +5,8 @@ module.exports = (env, argv) => ({
     output: {
         path: path.join(__dirname, './dist'),
         filename: (argv.minimize) ? 'browser-file-storage.min.js' : 'browser-file-storage.js',
-        library: 'browser-file-storage',
         libraryTarget: 'umd',
-        umdNamedDefine: true
+        umdNamedDefine: true,
     },
     module: {
         rules: [

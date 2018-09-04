@@ -2,11 +2,6 @@ import MESSAGES from './messages'
 import MIMETYPES from './mimetypes'
 import LOGGER from './logger'
 
-const IDB = {
-    NAME: "BROWSER_FILE_STORAGE_JS",
-    CURRENT_VERSION: 2,
-}
-
 let SELF = null
 
 // *************************** //
@@ -19,6 +14,8 @@ class BrowserFileStorage {
         this._idb  = null
         this._db   = null
         this._namespace = null
+        this._idb_name = "BROWSER_FILE_STORAGE_JS",
+        this._idb_version = 2,
 
         this._idb = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB
         window.IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction || window.msIDBTransaction || {READ_WRITE: "readwrite"} // This line should only be needed if it is needed to support the object's constants for older browsers
@@ -42,7 +39,7 @@ class BrowserFileStorage {
         }
 
         SELF._namespace = namespace
-        let dbName = (namespace && typeof namespace === 'string') ? IDB.NAME + '_' + namespace : IDB.NAME 
+        let dbName = (namespace && typeof namespace === 'string') ? SELF._idb_name + '_' + namespace : SELF._idb_name 
         if(!SELF._idb) {
             SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_SUPPORTED, {})
             onFail({message: MESSAGES.IDB_NOT_SUPPORTED, supported: false})
@@ -57,7 +54,7 @@ class BrowserFileStorage {
                 SELF._log(LOGGER.LEVEL_INFO, MESSAGES.IDB_OPEN_SUCCESS, successObj || {})
                 SELF._init = true
                 onSuccess({message: MESSAGES.IDB_OPEN_SUCCESS, supported: true, initial: successObj.initial, upgrade: successObj.upgrade, versions: successObj.versions})
-            }, IDB.CURRENT_VERSION)
+            }, SELF._idb_version)
         }
     }
 
