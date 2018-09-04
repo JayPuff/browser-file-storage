@@ -23,6 +23,9 @@ export default {
     IDB_LOAD_SUCCESS: "Successfully loaded a file from database.",
     IDB_LOAD_FIND_FAIL: "Could not find the file in the database.",
     IDB_LOAD_FAIL: "Failed at loading file from database.",
+    
+    IDB_LOAD_ALL_SUCCESS: "Successfully loaded all files from database.",
+    IDB_LOAD_ALL_FAIL: "Could not load all files from the database.",
 
-    NO_MIME_TYPE: "File saved with no mimetype.",
+    NO_MIME_TYPE: "Cannot auto-detect mimetype for filename, setting mimetype to a safe default type",
 }

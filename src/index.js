@@ -1,7 +1,9 @@
 import MESSAGES from './messages'
 import MIMETYPES from './mimetypes'
 import LOGGER from './logger'
+import FileAbstraction from './file';
 
+const EMPTY_FUNC = () => {}
 let SELF = null
 
 // *************************** //
@@ -15,7 +17,7 @@ class BrowserFileStorage {
         this._db   = null
         this._namespace = null
         this._idb_name = "BROWSER_FILE_STORAGE_JS",
-        this._idb_version = 2,
+        this._idb_version = 3,
 
         this._idb = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB
         window.IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction || window.msIDBTransaction || {READ_WRITE: "readwrite"} // This line should only be needed if it is needed to support the object's constants for older browsers
@@ -31,7 +33,12 @@ class BrowserFileStorage {
     }
 
 
-    init ({namespace, onSuccess, onFail}) {
+    init (params) {
+        params = params || {}
+        let namespace = params.namespace
+        let onSuccess = params.onSuccess || EMPTY_FUNC
+        let onFail = params.onFail || EMPTY_FUNC
+
         if(SELF._init) {
             SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_ALREADY_INIT, {})
             onFail({message: MESSAGES.IDB_ALREADY_INIT, supported: true})
@@ -101,16 +108,20 @@ class BrowserFileStorage {
             } else {
                 // First time initializing DB
                 initial = true
-                filesStore = this._db.createObjectStore("files", { keyPath: "path" })
+                filesStore = this._db.createObjectStore("files", { keyPath: "filename" })
             }
             
-            storeCreateIndex(filesStore, 'name', { unique: false } )
+            storeCreateIndex(filesStore, 'filename', { unique: false } )
             storeCreateIndex(filesStore, 'modified', { unique: false } )
         };
     }
 
 
-    persist ({onSuccess, onFail}) {
+    persist (params) {
+        params = params || {}
+        let onSuccess = params.onSuccess || EMPTY_FUNC
+        let onFail = params.onFail || EMPTY_FUNC
+
         if(!SELF._init) {
             SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'persist'})
             onFail({message: MESSAGES.IDB_NOT_INIT, method: 'persist'})
@@ -142,7 +153,14 @@ class BrowserFileStorage {
     // blob
     // fileupload
     // raw binary... string???
-    save ({filename, content, onSuccess, onFail, mimeType}) {
+    save (params) {
+        params = params || {}
+        let onSuccess = params.onSuccess || EMPTY_FUNC
+        let onFail = params.onFail || EMPTY_FUNC
+        let contents = params.contents
+        let filename = params.filename
+        let mimeType = params.mimeType
+
         // Validation and Blob Creation.
         if(!SELF._init) {
             SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'save'})
@@ -156,17 +174,17 @@ class BrowserFileStorage {
             return
         }
 
-        if(!content) {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NO_CONTENT, {errors: { filename: false, content: true }})
-            onFail({message: MESSAGES.IDB_NO_CONTENT, errors: { filename: false, content: true } })
+        if(!contents) {
+            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NO_CONTENT, {errors: { filename: false, contents: true }})
+            onFail({message: MESSAGES.IDB_NO_CONTENT, errors: { filename: false, contents: true } })
             return
         }
 
-        let blobToSave = SELF._createBlobToSave({filename:filename,content:content,mimeType:mimeType})
+        let fileToSave = SELF._createFileToSave({filename:filename,contents:contents,mimeType:mimeType})
 
-        if(!blobToSave) {
-            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_WRONG_CONTENT, {errors: { filename: false, content: true, parseToBlob: true }})
-            onFail({message: MESSAGES.IDB_WRONG_CONTENT, errors: { filename: false, content: true, parseToBlob: true } })
+        if(!fileToSave) {
+            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_WRONG_CONTENT, {errors: { filename: false, contents: true, parseToBlob: true }})
+            onFail({message: MESSAGES.IDB_WRONG_CONTENT, errors: { filename: false, contents: true, parseToBlob: true } })
             return
         } 
 
@@ -174,11 +192,7 @@ class BrowserFileStorage {
         let transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite")
         let objectStore = transaction.objectStore("files")
 
-        let addRequest = objectStore.put({
-            path: filename,
-            lastModified: (new Date()).getTime(),
-            blob: blobToSave 
-        })
+        let addRequest = objectStore.put(fileToSave._toIDB())
 
         addRequest.onsuccess = (event) => {
             SELF._log(LOGGER.LEVEL_INFO, MESSAGES.IDB_SAVE_SUCCESS, {event: event})
@@ -192,8 +206,13 @@ class BrowserFileStorage {
 
     }
 
+    // filename, onSuccess, onFail
+    load (params) {
+        params = params || {}
+        let onSuccess = params.onSuccess || EMPTY_FUNC
+        let onFail = params.onFail || EMPTY_FUNC
+        let filename = params.filename
 
-    load ({filename, onSuccess, onFail}) {
         if(!SELF._init) {
             SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'load'})
             onFail({message: MESSAGES.IDB_NOT_INIT})
@@ -213,8 +232,9 @@ class BrowserFileStorage {
         request.onsuccess = (event) => {
             // Do something with the request.result!
             if(request.result) {
-                SELF._log(LOGGER.LEVEL_INFO, MESSAGES.IDB_LOAD_SUCCESS, {event: event, request: request})
-                onSuccess(request.result, {event: event, request: request})
+                let fileToLoad = new FileAbstraction(request.result)
+                SELF._log(LOGGER.LEVEL_INFO, MESSAGES.IDB_LOAD_SUCCESS, {file: fileToLoad, event: event, request: request})
+                onSuccess(fileToLoad, {event: event, request: request})
             } else {
                 SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_FIND_FAIL, {event: event, request: request, errors: {notFound: true} })
                 onFail({message: MESSAGES.IDB_LOAD_FIND_FAIL, event: event, request: request, errors: {notFound: true} })
@@ -227,8 +247,67 @@ class BrowserFileStorage {
         }
     }
 
-    // Return a Blob
-    _createBlobToSave ({filename, content, mimeType}) {
+    // onSuccess, onFail
+    loadAll (params) {
+        params = params || {}
+        let onSuccess = params.onSuccess || EMPTY_FUNC
+        let onFail = params.onFail || EMPTY_FUNC
+
+        if(!SELF._init) {
+            SELF._log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'loadAll'})
+            onFail({message: MESSAGES.IDB_NOT_INIT})
+            return
+        }
+
+        let transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite")
+        let objectStore = transaction.objectStore("files")
+
+        if(objectStore.getAll) {
+            // Parameters for getAll (query, maxToReturnIfOver1)
+            let getRequest = objectStore.getAll()
+            
+            getRequest.onsuccess = function(event) {
+                let files = []
+                if(!event.target.result[0]) {
+                    files.push(new FileAbstraction(event.target.result))
+                } else {
+                    for(let r in event.target.result) {
+                        files.push(new FileAbstraction(event.target.result[r]))
+                    }
+                }
+                LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_LOAD_ALL_SUCCESS, {files: files, event: event, request: getRequest})
+                onSuccess(files, {message: MESSAGES.IDB_LOAD_ALL_SUCCESS, event: event, request: getRequest})
+            }
+
+            getRequest.onerror = function(event) {
+                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_ALL_FAIL, {event: event, request: getRequest, errors: {db: true}})
+                onFail({message: MESSAGES.IDB_LOAD_ALL_FAIL, event: event, request: getRequest, errors: {db: true}})
+            }
+        }
+        // } else {
+        //     // Fallback to the traditional cursor approach if getAll isn't supported.
+        //     let files = []
+        //     let cursorRequest = objectStore.openCursor()
+            
+        //     cursorRequest.onsuccess = function(event) {
+        //         let cursor = event.target.result
+        //         if (cursor) {
+        //             files.push(cursor.value)
+        //             cursor.continue()
+        //         } else {
+        //             callback(null,files)
+        //         }
+        //     }
+
+        //     cursorRequest.onerror = function(event) {
+        //         callback(new Error('File Storage - getAllFiles - Cursor Mode - Unable to get all files'), event)
+        //     }
+        // }
+
+    }
+
+    // Return a File Abstraction
+    _createFileToSave ({filename, contents, mimeType}) {
         if(!mimeType || typeof mimeType !== 'string' || mimeType == '') {
             mimeType = null
         }
@@ -238,46 +317,54 @@ class BrowserFileStorage {
         let givenMimeType = (!mimeType || typeof mimeType !== 'string' || mimeType == '') ? null : mimeType
         let newBlob = null
 
-        if(typeof content === 'string') {
+        if(typeof contents === 'string') {
             if(!givenMimeType) {
                 if(ext) {
                     if(existingMime) {
-                        newBlob = new Blob([content], {type: existingMime})
+                        newBlob = new Blob([contents], {type: existingMime})
                     } else {
-                        this._log(LOGGER.LEVEL_WARN, MESSAGES.NO_MIME_TYPE, {filename: filename, content: content, mimeType: mimeType, method: '_createBlobToSave'})
-                        newBlob = new Blob([content])
+                        this._log(LOGGER.LEVEL_WARN, MESSAGES.NO_MIME_TYPE, {filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave'})
+                        newBlob = new Blob([contents], {type: 'text/plain'})
                     }
                 } else {
-                    this._log(LOGGER.LEVEL_WARN, MESSAGES.NO_MIME_TYPE, {filename: filename, content: content, mimeType: mimeType, method: '_createBlobToSave'})
-                    newBlob = new Blob([content])
+                    this._log(LOGGER.LEVEL_WARN, MESSAGES.NO_MIME_TYPE, {filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave'})
+                    newBlob = new Blob([contents], {type: 'text/plain'})
                 }
             } else {
-                newBlob = new Blob([content], {type: givenMimeType})
+                newBlob = new Blob([contents], {type: givenMimeType})
             }
-        } else if (content instanceof Blob) {
-            if(content.type == '') {
+        } else if (contents instanceof Blob) {
+            if(contents.type == '') {
                 if(!givenMimeType) {
                     if(existingMime) {
-                        newBlob = new Blob([content], {type: existingMime})
+                        newBlob = new Blob([contents], {type: existingMime})
                     } else {
-                        this._log(LOGGER.LEVEL_WARN, MESSAGES.NO_MIME_TYPE, {filename: filename, content: content, mimeType: mimeType, method: '_createBlobToSave'})
-                        newBlob = new Blob([content])
+                        this._log(LOGGER.LEVEL_WARN, MESSAGES.NO_MIME_TYPE, {filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave'})
+                        newBlob = new Blob([contents], {type: 'application/octet-stream'})
                     }
                 } else {
-                    newBlob = new Blob([content], {type: givenMimeType})
+                    newBlob = new Blob([contents], {type: givenMimeType})
                 }
             } else {
                 if(!givenMimeType) {
-                    newBlob = new Blob([content], {type: givenMimeType})
+                    newBlob = new Blob([contents], {type: givenMimeType})
                 } else {
-                    newBlob = content
+                    newBlob = contents
                 }
             }
         } else {
             return null
         }
 
-        return newBlob
+        let fileToSave = new FileAbstraction({
+            filename: filename,
+            blob: newBlob,
+            lastModified: (new Date()).getTime(),
+            extension: ext,
+            size: newBlob.size
+        })
+
+        return fileToSave
     }
 
     _getExtension (string) {

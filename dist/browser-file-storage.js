@@ -119,10 +119,15 @@ var _logger = __webpack_require__(3);
 
 var _logger2 = _interopRequireDefault(_logger);
 
+var _file = __webpack_require__(4);
+
+var _file2 = _interopRequireDefault(_file);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
+var EMPTY_FUNC = function EMPTY_FUNC() {};
 var SELF = null;
 
 // *************************** //
@@ -137,7 +142,7 @@ var BrowserFileStorage = function () {
         this._idb = null;
         this._db = null;
         this._namespace = null;
-        this._idb_name = "BROWSER_FILE_STORAGE_JS", this._idb_version = 2, this._idb = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
+        this._idb_name = "BROWSER_FILE_STORAGE_JS", this._idb_version = 3, this._idb = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
         window.IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction || window.msIDBTransaction || { READ_WRITE: "readwrite" // This line should only be needed if it is needed to support the object's constants for older browsers
         };window.IDBKeyRange = window.IDBKeyRange || window.webkitIDBKeyRange || window.msIDBKeyRange;
     }
@@ -154,10 +159,11 @@ var BrowserFileStorage = function () {
         }
     }, {
         key: 'init',
-        value: function init(_ref) {
-            var namespace = _ref.namespace,
-                onSuccess = _ref.onSuccess,
-                onFail = _ref.onFail;
+        value: function init(params) {
+            params = params || {};
+            var namespace = params.namespace;
+            var onSuccess = params.onSuccess || EMPTY_FUNC;
+            var onFail = params.onFail || EMPTY_FUNC;
 
             if (SELF._init) {
                 SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_ALREADY_INIT, {});
@@ -230,18 +236,19 @@ var BrowserFileStorage = function () {
                 } else {
                     // First time initializing DB
                     initial = true;
-                    filesStore = _this._db.createObjectStore("files", { keyPath: "path" });
+                    filesStore = _this._db.createObjectStore("files", { keyPath: "filename" });
                 }
 
-                storeCreateIndex(filesStore, 'name', { unique: false });
+                storeCreateIndex(filesStore, 'filename', { unique: false });
                 storeCreateIndex(filesStore, 'modified', { unique: false });
             };
         }
     }, {
         key: 'persist',
-        value: function persist(_ref2) {
-            var onSuccess = _ref2.onSuccess,
-                onFail = _ref2.onFail;
+        value: function persist(params) {
+            params = params || {};
+            var onSuccess = params.onSuccess || EMPTY_FUNC;
+            var onFail = params.onFail || EMPTY_FUNC;
 
             if (!SELF._init) {
                 SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'persist' });
@@ -277,12 +284,13 @@ var BrowserFileStorage = function () {
 
     }, {
         key: 'save',
-        value: function save(_ref3) {
-            var filename = _ref3.filename,
-                content = _ref3.content,
-                onSuccess = _ref3.onSuccess,
-                onFail = _ref3.onFail,
-                mimeType = _ref3.mimeType;
+        value: function save(params) {
+            params = params || {};
+            var onSuccess = params.onSuccess || EMPTY_FUNC;
+            var onFail = params.onFail || EMPTY_FUNC;
+            var content = params.content;
+            var filename = params.filename;
+            var mimeType = params.mimeType;
 
             // Validation and Blob Creation.
             if (!SELF._init) {
@@ -303,9 +311,9 @@ var BrowserFileStorage = function () {
                 return;
             }
 
-            var blobToSave = SELF._createBlobToSave({ filename: filename, content: content, mimeType: mimeType });
+            var fileToSave = SELF._createFileToSave({ filename: filename, content: content, mimeType: mimeType });
 
-            if (!blobToSave) {
+            if (!fileToSave) {
                 SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_WRONG_CONTENT, { errors: { filename: false, content: true, parseToBlob: true } });
                 onFail({ message: _messages2.default.IDB_WRONG_CONTENT, errors: { filename: false, content: true, parseToBlob: true } });
                 return;
@@ -315,11 +323,7 @@ var BrowserFileStorage = function () {
             var transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite");
             var objectStore = transaction.objectStore("files");
 
-            var addRequest = objectStore.put({
-                path: filename,
-                lastModified: new Date().getTime(),
-                blob: blobToSave
-            });
+            var addRequest = objectStore.put(fileToSave._toIDB());
 
             addRequest.onsuccess = function (event) {
                 SELF._log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_SAVE_SUCCESS, { event: event });
@@ -331,12 +335,16 @@ var BrowserFileStorage = function () {
                 onFail({ message: _messages2.default.IDB_SAVE_FAIL, event: event, errors: { db: true } });
             };
         }
+
+        // filename, onSuccess, onFail
+
     }, {
         key: 'load',
-        value: function load(_ref4) {
-            var filename = _ref4.filename,
-                onSuccess = _ref4.onSuccess,
-                onFail = _ref4.onFail;
+        value: function load(params) {
+            params = params || {};
+            var onSuccess = params.onSuccess || EMPTY_FUNC;
+            var onFail = params.onFail || EMPTY_FUNC;
+            var filename = params.filename;
 
             if (!SELF._init) {
                 SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'load' });
@@ -357,8 +365,9 @@ var BrowserFileStorage = function () {
             request.onsuccess = function (event) {
                 // Do something with the request.result!
                 if (request.result) {
-                    SELF._log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_LOAD_SUCCESS, { event: event, request: request });
-                    onSuccess(request.result, { event: event, request: request });
+                    var fileToLoad = new _file2.default(request.result);
+                    SELF._log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_LOAD_SUCCESS, { file: fileToLoad, event: event, request: request });
+                    onSuccess(fileToLoad, { event: event, request: request });
                 } else {
                     SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_FIND_FAIL, { event: event, request: request, errors: { notFound: true } });
                     onFail({ message: _messages2.default.IDB_LOAD_FIND_FAIL, event: event, request: request, errors: { notFound: true } });
@@ -371,14 +380,75 @@ var BrowserFileStorage = function () {
             };
         }
 
-        // Return a Blob
+        // onSuccess, onFail
 
     }, {
-        key: '_createBlobToSave',
-        value: function _createBlobToSave(_ref5) {
-            var filename = _ref5.filename,
-                content = _ref5.content,
-                mimeType = _ref5.mimeType;
+        key: 'loadAll',
+        value: function loadAll(params) {
+            params = params || {};
+            var onSuccess = params.onSuccess || EMPTY_FUNC;
+            var onFail = params.onFail || EMPTY_FUNC;
+
+            if (!SELF._init) {
+                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'loadAll' });
+                onFail({ message: _messages2.default.IDB_NOT_INIT });
+                return;
+            }
+
+            var transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite");
+            var objectStore = transaction.objectStore("files");
+
+            if (objectStore.getAll) {
+                // Parameters for getAll (query, maxToReturnIfOver1)
+                var getRequest = objectStore.getAll();
+
+                getRequest.onsuccess = function (event) {
+                    var files = [];
+                    if (!event.target.result[0]) {
+                        files.push(new _file2.default(event.target.result));
+                    } else {
+                        for (var r in event.target.result) {
+                            files.push(new _file2.default(event.target.result[r]));
+                        }
+                    }
+                    _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_LOAD_ALL_SUCCESS, { files: files, event: event, request: getRequest });
+                    onSuccess(files, { message: _messages2.default.IDB_LOAD_ALL_SUCCESS, event: event, request: getRequest });
+                };
+
+                getRequest.onerror = function (event) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_ALL_FAIL, { event: event, request: getRequest, errors: { db: true } });
+                    onFail({ message: _messages2.default.IDB_LOAD_ALL_FAIL, event: event, request: getRequest, errors: { db: true } });
+                };
+            }
+            // } else {
+            //     // Fallback to the traditional cursor approach if getAll isn't supported.
+            //     let files = []
+            //     let cursorRequest = objectStore.openCursor()
+
+            //     cursorRequest.onsuccess = function(event) {
+            //         let cursor = event.target.result
+            //         if (cursor) {
+            //             files.push(cursor.value)
+            //             cursor.continue()
+            //         } else {
+            //             callback(null,files)
+            //         }
+            //     }
+
+            //     cursorRequest.onerror = function(event) {
+            //         callback(new Error('File Storage - getAllFiles - Cursor Mode - Unable to get all files'), event)
+            //     }
+            // }
+        }
+
+        // Return a File Abstraction
+
+    }, {
+        key: '_createFileToSave',
+        value: function _createFileToSave(_ref) {
+            var filename = _ref.filename,
+                content = _ref.content,
+                mimeType = _ref.mimeType;
 
             if (!mimeType || typeof mimeType !== 'string' || mimeType == '') {
                 mimeType = null;
@@ -396,11 +466,11 @@ var BrowserFileStorage = function () {
                             newBlob = new Blob([content], { type: existingMime });
                         } else {
                             this._log(_logger2.default.LEVEL_WARN, _messages2.default.NO_MIME_TYPE, { filename: filename, content: content, mimeType: mimeType, method: '_createBlobToSave' });
-                            newBlob = new Blob([content]);
+                            newBlob = new Blob([content], { type: 'text/plain' });
                         }
                     } else {
                         this._log(_logger2.default.LEVEL_WARN, _messages2.default.NO_MIME_TYPE, { filename: filename, content: content, mimeType: mimeType, method: '_createBlobToSave' });
-                        newBlob = new Blob([content]);
+                        newBlob = new Blob([content], { type: 'text/plain' });
                     }
                 } else {
                     newBlob = new Blob([content], { type: givenMimeType });
@@ -412,7 +482,7 @@ var BrowserFileStorage = function () {
                             newBlob = new Blob([content], { type: existingMime });
                         } else {
                             this._log(_logger2.default.LEVEL_WARN, _messages2.default.NO_MIME_TYPE, { filename: filename, content: content, mimeType: mimeType, method: '_createBlobToSave' });
-                            newBlob = new Blob([content]);
+                            newBlob = new Blob([content], { type: 'application/octet-stream' });
                         }
                     } else {
                         newBlob = new Blob([content], { type: givenMimeType });
@@ -428,7 +498,15 @@ var BrowserFileStorage = function () {
                 return null;
             }
 
-            return newBlob;
+            var fileToSave = new _file2.default({
+                filename: filename,
+                blob: newBlob,
+                lastModified: new Date().getTime(),
+                extension: ext,
+                size: newBlob.size
+            });
+
+            return fileToSave;
         }
     }, {
         key: '_getExtension',
@@ -505,7 +583,10 @@ exports.default = {
     IDB_LOAD_FIND_FAIL: "Could not find the file in the database.",
     IDB_LOAD_FAIL: "Failed at loading file from database.",
 
-    NO_MIME_TYPE: "File saved with no mimetype."
+    IDB_LOAD_ALL_SUCCESS: "Successfully loaded all files from database.",
+    IDB_LOAD_ALL_FAIL: "Could not load all files from the database.",
+
+    NO_MIME_TYPE: "Cannot auto-detect mimetype for filename, setting mimetype to a safe default type"
 };
 
 /***/ }),
@@ -519,7 +600,74 @@ Object.defineProperty(exports, "__esModule", {
     value: true
 });
 exports.default = {
-    'json': 'application/json'
+    "aac": "audio/aac",
+    "abw": "application/x-abiword",
+    "arc": "application/octet-stream",
+    "avi": "video/x-msvideo",
+    "azw": "application/vnd.amazon.ebook",
+    "bin": "application/octet-stream",
+    "bmp": "image/bmp",
+    "bz": "application/x-bzip",
+    "bz2": "application/x-bzip2",
+    "csh": "application/x-csh",
+    "css": "text/css",
+    "csv": "text/csv",
+    "doc": "application/msword",
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "eot": "application/vnd.ms-fontobject",
+    "epub": "application/epub+zip",
+    "es": "application/ecmascript",
+    "gif": "image/gif",
+    "htm": "text/html",
+    "html": "text/html",
+    "ico": "image/x-icon",
+    "ics": "text/calendar",
+    "jar": "application/java-archive",
+    "jpeg": "image/jpeg",
+    "js": "application/javascript",
+    "json": "application/json",
+    "mid": "audio/midi",
+    "mpeg": "video/mpeg",
+    "mp4": "video/mp4",
+    "mpkg": "application/vnd.apple.installer+xml",
+    "odp": "application/vnd.oasis.opendocument.presentation",
+    "ods": "application/vnd.oasis.opendocument.spreadsheet",
+    "odt": "application/vnd.oasis.opendocument.text",
+    "oga": "audio/ogg",
+    "ogv": "video/ogg",
+    "ogx": "application/ogg",
+    "otf": "font/otf",
+    "png": "image/png",
+    "pdf": "application/pdf",
+    "ppt": "application/vnd.ms-powerpoint",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "rar": "application/x-rar-compressed",
+    "rtf": "application/rtf",
+    "sh": "application/x-sh",
+    "svg": "image/svg+xml",
+    "swf": "application/x-shockwave-flash",
+    "tar": "application/x-tar",
+    "tiff": "image/tiff",
+    "tif": "image/tiff",
+    "ts": "application/typescript",
+    "ttf": "font/ttf",
+    "txt": "text/plain",
+    "vsd": "application/vnd.visio",
+    "wav": "audio/wav",
+    "weba": "audio/webm",
+    "webm": "video/webm",
+    "webp": "image/webp",
+    "woff": "font/woff",
+    "woff2": "font/woff2",
+    "xhtml": "application/xhtml+xml",
+    "xls": "application/vnd.ms-excel",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "xml": "application/xml",
+    "xul": "application/vnd.mozilla.xul+xml",
+    "zip": "application/zip",
+    "3gp": "video/3gpp",
+    "3g2": "video/3gpp2",
+    "7z": "application/x-7z-compressed"
 };
 
 /***/ }),
@@ -570,6 +718,67 @@ logger.log = log;
 logger.logLevel = logLevel;
 
 exports.default = logger;
+
+/***/ }),
+/* 4 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+var FileAbstraction = function () {
+    function FileAbstraction(props) {
+        _classCallCheck(this, FileAbstraction);
+
+        this.filename = props.filename;
+        this.lastModified = props.lastModified;
+        this.blob = props.blob;
+        this.ext = props.extension;
+        this.size = props.size;
+    }
+
+    _createClass(FileAbstraction, [{
+        key: "_toIDB",
+        value: function _toIDB() {
+            return {
+                filename: this.filename,
+                lastModified: this.lastModified,
+                blob: this.blob,
+                ext: this.ext,
+                size: this.size
+            };
+        }
+    }, {
+        key: "createURL",
+        value: function createURL() {
+            if (this._createdURL) {
+                return this._createdURL;
+            }
+            this._createdURL = URL.createObjectURL(this.blob);
+            return this._createdURL;
+        }
+    }, {
+        key: "destroyURL",
+        value: function destroyURL() {
+            if (this._createdURL) {
+                URL.revokeObjectURL(this._createdURL);
+                this._createdURL = null;
+            }
+        }
+    }]);
+
+    return FileAbstraction;
+}();
+
+exports.default = FileAbstraction;
 
 /***/ })
 /******/ ]);
