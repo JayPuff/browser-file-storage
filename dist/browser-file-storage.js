@@ -288,7 +288,7 @@ var BrowserFileStorage = function () {
             params = params || {};
             var onSuccess = params.onSuccess || EMPTY_FUNC;
             var onFail = params.onFail || EMPTY_FUNC;
-            var content = params.content;
+            var contents = params.contents;
             var filename = params.filename;
             var mimeType = params.mimeType;
 
@@ -305,17 +305,17 @@ var BrowserFileStorage = function () {
                 return;
             }
 
-            if (!content) {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NO_CONTENT, { errors: { filename: false, content: true } });
-                onFail({ message: _messages2.default.IDB_NO_CONTENT, errors: { filename: false, content: true } });
+            if (!contents) {
+                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NO_CONTENT, { errors: { filename: false, contents: true } });
+                onFail({ message: _messages2.default.IDB_NO_CONTENT, errors: { filename: false, contents: true } });
                 return;
             }
 
-            var fileToSave = SELF._createFileToSave({ filename: filename, content: content, mimeType: mimeType });
+            var fileToSave = SELF._createFileToSave({ filename: filename, contents: contents, mimeType: mimeType });
 
             if (!fileToSave) {
-                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_WRONG_CONTENT, { errors: { filename: false, content: true, parseToBlob: true } });
-                onFail({ message: _messages2.default.IDB_WRONG_CONTENT, errors: { filename: false, content: true, parseToBlob: true } });
+                SELF._log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_WRONG_CONTENT, { errors: { filename: false, contents: true, parseToBlob: true } });
+                onFail({ message: _messages2.default.IDB_WRONG_CONTENT, errors: { filename: false, contents: true, parseToBlob: true } });
                 return;
             }
 
@@ -447,7 +447,7 @@ var BrowserFileStorage = function () {
         key: '_createFileToSave',
         value: function _createFileToSave(_ref) {
             var filename = _ref.filename,
-                content = _ref.content,
+                contents = _ref.contents,
                 mimeType = _ref.mimeType;
 
             if (!mimeType || typeof mimeType !== 'string' || mimeType == '') {
@@ -459,39 +459,39 @@ var BrowserFileStorage = function () {
             var givenMimeType = !mimeType || typeof mimeType !== 'string' || mimeType == '' ? null : mimeType;
             var newBlob = null;
 
-            if (typeof content === 'string') {
+            if (typeof contents === 'string') {
                 if (!givenMimeType) {
                     if (ext) {
                         if (existingMime) {
-                            newBlob = new Blob([content], { type: existingMime });
+                            newBlob = new Blob([contents], { type: existingMime });
                         } else {
-                            this._log(_logger2.default.LEVEL_WARN, _messages2.default.NO_MIME_TYPE, { filename: filename, content: content, mimeType: mimeType, method: '_createBlobToSave' });
-                            newBlob = new Blob([content], { type: 'text/plain' });
+                            this._log(_logger2.default.LEVEL_WARN, _messages2.default.NO_MIME_TYPE, { filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave' });
+                            newBlob = new Blob([contents], { type: 'text/plain' });
                         }
                     } else {
-                        this._log(_logger2.default.LEVEL_WARN, _messages2.default.NO_MIME_TYPE, { filename: filename, content: content, mimeType: mimeType, method: '_createBlobToSave' });
-                        newBlob = new Blob([content], { type: 'text/plain' });
+                        this._log(_logger2.default.LEVEL_WARN, _messages2.default.NO_MIME_TYPE, { filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave' });
+                        newBlob = new Blob([contents], { type: 'text/plain' });
                     }
                 } else {
-                    newBlob = new Blob([content], { type: givenMimeType });
+                    newBlob = new Blob([contents], { type: givenMimeType });
                 }
-            } else if (content instanceof Blob) {
-                if (content.type == '') {
+            } else if (contents instanceof Blob) {
+                if (contents.type == '') {
                     if (!givenMimeType) {
                         if (existingMime) {
-                            newBlob = new Blob([content], { type: existingMime });
+                            newBlob = new Blob([contents], { type: existingMime });
                         } else {
-                            this._log(_logger2.default.LEVEL_WARN, _messages2.default.NO_MIME_TYPE, { filename: filename, content: content, mimeType: mimeType, method: '_createBlobToSave' });
-                            newBlob = new Blob([content], { type: 'application/octet-stream' });
+                            this._log(_logger2.default.LEVEL_WARN, _messages2.default.NO_MIME_TYPE, { filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave' });
+                            newBlob = new Blob([contents], { type: 'application/octet-stream' });
                         }
                     } else {
-                        newBlob = new Blob([content], { type: givenMimeType });
+                        newBlob = new Blob([contents], { type: givenMimeType });
                     }
                 } else {
                     if (!givenMimeType) {
-                        newBlob = new Blob([content], { type: givenMimeType });
+                        newBlob = new Blob([contents], { type: givenMimeType });
                     } else {
-                        newBlob = content;
+                        newBlob = contents;
                     }
                 }
             } else {
@@ -741,7 +741,7 @@ var FileAbstraction = function () {
         this.filename = props.filename;
         this.lastModified = props.lastModified;
         this.blob = props.blob;
-        this.ext = props.extension;
+        this.extension = props.extension;
         this.size = props.size;
     }
 
@@ -752,7 +752,7 @@ var FileAbstraction = function () {
                 filename: this.filename,
                 lastModified: this.lastModified,
                 blob: this.blob,
-                ext: this.ext,
+                extension: this.extension,
                 size: this.size
             };
         }
