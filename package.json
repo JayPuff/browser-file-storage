@@ -4,7 +4,7 @@
   "description": "Abstracts the complexity of indexed DB so that a user can easily save files/blobs by key/filename on the browser",
   "main": "browser-file-storage.js",
   "scripts": {
-    "build": ""
+    "build": "rimraf ./dist && webpack --config ./webpack.config.js --mode production && webpack --config ./webpack.config.js --mode production --minimize"
   },
   "repository": {
     "type": "git",
@@ -26,5 +26,13 @@
   "bugs": {
     "url": "https://github.com/JayPuff/browser-file-storage/issues"
   },
-  "homepage": "https://github.com/JayPuff/browser-file-storage#readme"
+  "homepage": "https://github.com/JayPuff/browser-file-storage#readme",
+  "devDependencies": {
+    "babel-core": "^6.26.3",
+    "babel-loader": "^7.1.5",
+    "babel-preset-env": "^1.7.0",
+    "rimraf": "^2.6.2",
+    "webpack": "^4.17.2",
+    "webpack-cli": "^3.1.0"
+  }
 }
