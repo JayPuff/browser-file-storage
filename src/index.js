@@ -411,9 +411,9 @@ class BrowserFileStorage {
                 }
             } else {
                 if(!givenMimeType) {
-                    newBlob = new Blob([contents], {type: givenMimeType})
-                } else {
                     newBlob = contents
+                } else {
+                    newBlob = new Blob([contents], {type: givenMimeType})
                 }
             }
         } else if (contents instanceof FileAbstraction) {

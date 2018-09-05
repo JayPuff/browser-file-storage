@@ -460,7 +460,7 @@ var BrowserFileStorage = function () {
                 return;
             }
 
-            var transaction = this._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite");
+            var transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite");
             var objectStore = transaction.objectStore("files");
 
             var deleteRequest = objectStore.delete(filename);
@@ -473,6 +473,34 @@ var BrowserFileStorage = function () {
             transaction.onerror = function (event) {
                 _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_DELETE_FAIL, { error: transaction.error, event: event, request: deleteRequest });
                 onFail({ message: _messages2.default.IDB_DELETE_FAIL, error: transaction.error, event: event, request: deleteRequest });
+            };
+        }
+    }, {
+        key: 'deleteAll',
+        value: function deleteAll(params) {
+            params = params || {};
+            var onSuccess = params.onSuccess || EMPTY_FUNC;
+            var onFail = params.onFail || EMPTY_FUNC;
+
+            if (!SELF._init) {
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'delete' });
+                onFail({ message: _messages2.default.IDB_NOT_INIT });
+                return;
+            }
+
+            var transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite");
+            var objectStore = transaction.objectStore("files");
+
+            var clearRequest = objectStore.clear();
+
+            transaction.oncomplete = function (event) {
+                _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_DELETE_ALL_SUCCESS, { event: event, request: clearRequest });
+                onSuccess({ message: _messages2.default.IDB_DELETE_ALL_SUCCESS, event: event, request: clearRequest });
+            };
+
+            transaction.onerror = function (event) {
+                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_DELETE_ALL_FAIL, { error: transaction.error, event: event, request: clearRequest });
+                onFail({ message: _messages2.default.IDB_DELETE_ALL_FAIL, error: transaction.error, event: event, request: clearRequest });
             };
         }
 
@@ -524,10 +552,21 @@ var BrowserFileStorage = function () {
                     }
                 } else {
                     if (!givenMimeType) {
-                        newBlob = new Blob([contents], { type: givenMimeType });
-                    } else {
                         newBlob = contents;
+                    } else {
+                        newBlob = new Blob([contents], { type: givenMimeType });
                     }
+                }
+            } else if (contents instanceof _file2.default) {
+                if (!givenMimeType) {
+                    if (existingMime) {
+                        newBlob = new Blob([contents.blob], { type: existingMime });
+                    } else {
+                        _logger2.default.log(_logger2.default.LEVEL_WARN, _messages2.default.NO_MIME_TYPE, { filename: filename, contents: contents, mimeType: mimeType, method: '_createBlobToSave' });
+                        newBlob = new Blob([contents.blob], { type: 'application/octet-stream' });
+                    }
+                } else {
+                    newBlob = new Blob([contents.blob], { type: givenMimeType });
                 }
             } else {
                 return null;
@@ -620,6 +659,12 @@ exports.default = {
 
     IDB_LOAD_ALL_SUCCESS: "Successfully loaded all files from database.",
     IDB_LOAD_ALL_FAIL: "Could not load all files from the database.",
+
+    IDB_DELETE_SUCCESS: "Successfully deleted a file from database.",
+    IDB_DELETE_FAIL: "Failed at deleting file from database.",
+
+    IDB_DELETE_ALL_SUCCESS: "Successfully deleted all files from database.",
+    IDB_DELETE_ALL_FAIL: "Could not delete all files from the database.",
 
     NO_MIME_TYPE: "Cannot auto-detect mimetype for filename, setting mimetype to a safe default type"
 };
@@ -808,6 +853,9 @@ var FileAbstraction = function () {
                 this._createdURL = null;
             }
         }
+    }, {
+        key: "toString",
+        value: function toString() {}
     }]);
 
     return FileAbstraction;

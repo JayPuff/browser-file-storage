@@ -10,7 +10,7 @@ class FileAbstraction {
         this.size = props.size
     }
 
-    _toIDB() {
+    _toIDB () {
         return {
             filename: this.filename,
             lastModified: this.lastModified,
@@ -20,7 +20,7 @@ class FileAbstraction {
         }
     }
 
-    createURL() {
+    createURL () {
         if(this._createdURL) {
             return this._createdURL
         }
@@ -28,11 +28,15 @@ class FileAbstraction {
         return this._createdURL
     }
 
-    destroyURL() {
+    destroyURL () {
         if(this._createdURL) {
             URL.revokeObjectURL(this._createdURL)
             this._createdURL = null
         }
+    }
+
+    toString () {
+        
     }
 }
 
