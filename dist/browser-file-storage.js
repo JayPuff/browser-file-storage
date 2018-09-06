@@ -147,43 +147,52 @@ var BrowserFileStorage = function () {
         };window.IDBKeyRange = window.IDBKeyRange || window.webkitIDBKeyRange || window.msIDBKeyRange;
     }
 
+    // Set log level for browserFileStorage
+    // 'none', 'error', 'warn', 'info' 
+
+
     _createClass(BrowserFileStorage, [{
         key: 'logLevel',
         value: function logLevel(level) {
             _logger2.default.logLevel(level);
         }
+
+        // Init opens the inner IndexedDB database
+        // By giving it a namespace, we make a different 'Instance' of the database.
+        // Adds safety against this same library being used in more than one place within the same domain. (Just in case a library you include also includes this...)
+        // namespace can just be the name of your app
+        /**
+         * Opens the inner database. 
+         * @param {string} [namespace] - Identify the inner database instance by appending your namespace. It could be your app's name.
+         * @returns {Promise} - Returns a Promise which resolves if the inner database is initialized properly. 
+         */
+
     }, {
         key: 'init',
-        value: function init(params) {
-            params = params || {};
-            var namespace = params.namespace;
-            var onSuccess = params.onSuccess || EMPTY_FUNC;
-            var onFail = params.onFail || EMPTY_FUNC;
+        value: function init(namespace) {
+            return new Promise(function (resolve, reject) {
+                if (SELF._init) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_ALREADY_INIT, {});
+                    return reject({ alreadyInit: true, supported: true });
+                }
 
-            if (SELF._init) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_ALREADY_INIT, {});
-                onFail({ message: _messages2.default.IDB_ALREADY_INIT, supported: true });
-                return;
-            }
+                if (SELF._idb) {
+                    var dbName = namespace && typeof namespace === 'string' ? SELF._idb_name + '_' + namespace : SELF._idb_name;
+                    SELF._opendb(dbName, function (err, successObj) {
+                        if (err) {
+                            _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_COULD_NOT_OPEN, { dbError: true, error: err.error, dbObject: err });
+                            return reject({ dbError: true, error: err.error, supported: true });
+                        }
 
-            SELF._namespace = namespace;
-            var dbName = namespace && typeof namespace === 'string' ? SELF._idb_name + '_' + namespace : SELF._idb_name;
-            if (!SELF._idb) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_SUPPORTED, {});
-                onFail({ message: _messages2.default.IDB_NOT_SUPPORTED, supported: false });
-            } else {
-                SELF._opendb(dbName, function (err, successObj) {
-                    if (err) {
-                        _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_COULD_NOT_OPEN, { err: err });
-                        onFail({ message: _messages2.default.IDB_COULD_NOT_OPEN, error: err.error, supported: true });
-                        return;
-                    }
-
-                    _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_OPEN_SUCCESS, successObj || {});
-                    SELF._init = true;
-                    onSuccess({ message: _messages2.default.IDB_OPEN_SUCCESS, supported: true, initial: successObj.initial, upgrade: successObj.upgrade, versions: successObj.versions });
-                }, SELF._idb_version);
-            }
+                        SELF._init = true;
+                        _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_OPEN_SUCCESS, {});
+                        return resolve({ initial: successObj.initial, supported: true });
+                    }, SELF._idb_version);
+                } else {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_SUPPORTED, {});
+                    return reject({ supported: false });
+                }
+            });
         }
     }, {
         key: '_opendb',
@@ -236,34 +245,36 @@ var BrowserFileStorage = function () {
                 storeCreateIndex(filesStore, 'modified', { unique: false });
             };
         }
+
+        // Persist takes no arguments.
+        // It will ask or attempt to persist in whatever way the target browser deals with it
+        // Persist will always resolve unless the entire class was not initialized.
+        // Can check 'persistent' to see if request was approved by user/browser and 'canPersist' to see if it was possible in the first place. 
+
     }, {
         key: 'persist',
-        value: function persist(params) {
-            params = params || {};
-            var onSuccess = params.onSuccess || EMPTY_FUNC;
-            var onFail = params.onFail || EMPTY_FUNC;
+        value: function persist() {
+            return new Promise(function (resolve, reject) {
+                if (!SELF._init) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'persist' });
+                    return reject({ message: _messages2.default.IDB_NOT_INIT });
+                }
 
-            if (!SELF._init) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'persist' });
-                onFail({ message: _messages2.default.IDB_NOT_INIT, method: 'persist' });
-                return;
-            }
-
-            // Can also call perisisted() Promise to see current mode.
-            if (navigator.storage && navigator.storage.persist) {
-                navigator.storage.persist().then(function (persistent) {
-                    if (persistent) {
-                        _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_PERSIST_PASS, {});
-                        onSuccess({ message: _messages2.default.IDB_PERSIST_PASS, persistent: true });
-                    } else {
-                        _logger2.default.log(_logger2.default.LEVEL_WARN, _messages2.default.IDB_PERSIST_FAIL, {});
-                        onFail({ message: _messages2.default.IDB_PERSIST_FAIL, canPersist: true });
-                    }
-                });
-            } else {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_PERSIST_NONE, {});
-                onFail({ message: _messages2.default.IDB_PERSIST_NONE, canPersist: false });
-            }
+                if (navigator.storage && navigator.storage.persist) {
+                    navigator.storage.persist().then(function (persistent) {
+                        if (persistent) {
+                            _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_PERSIST_PASS, { persistent: true, canPersist: true });
+                            return resolve({ persistent: true, canPersist: true });
+                        } else {
+                            _logger2.default.log(_logger2.default.LEVEL_WARN, _messages2.default.IDB_PERSIST_FAIL, { persistent: false, canPersist: true });
+                            return resolve({ persistent: false, canPersist: true });
+                        }
+                    });
+                } else {
+                    _logger2.default.log(_logger2.default.LEVEL_WARN, _messages2.default.IDB_PERSIST_NONE, { persistent: false, canPersist: false });
+                    return resolve({ persistent: false, canPersist: false });
+                }
+            });
         }
 
         // Force the mode?

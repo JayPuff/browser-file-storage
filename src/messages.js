@@ -13,8 +13,7 @@ export default {
 
 
     IDB_BAD_FILENAME: "Filename is not a string, or is empty.",
-    IDB_NO_CONTENT: "No Content specified.",
-    IDB_WRONG_CONTENT: "Content given is not a string nor blob",
+    IDB_WRONG_CONTENT: "Content given is not valid [String, Blob, or FileAbstraction]",
 
     IDB_SAVE_SUCCESS: "Successfully saved a file to database.",
     IDB_SAVE_FAIL: "Failed at saving file to database.",
