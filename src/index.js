@@ -3,8 +3,8 @@ import MIMETYPES from './mimetypes'
 import LOGGER from './logger'
 import SavedFile from './file';
 
-const EMPTY_FUNC = () => {}
-let SELF = null
+const EMPTY_FUNC = () => {} //@TODO: remove.
+let SELF = null // This messes up if end-user uses arrow functions in some cases...
 
 // *************************** //
 // **** CLASS DECLARATION **** //

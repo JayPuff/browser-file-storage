@@ -1,7 +1,9 @@
-upgrade needed function ... just copies the old store?
-I guess it depends on upgrade and we might want to do different things depending on version...
-
-promisify? // seems like lots of callbacks... could help.
+- test all readme cases with function() rather than () => to make sure they work well
+- test actual use cases and document ... uploading a file using blob, downloading a file, .. all that we want implemented basically.
+- document file.js
+- finish save definition on what contents can be, and fix on read me when done.. (File (form)? js obj (and json parse... ugh.)? dataurl string? url?)
+- load -> array of filenames, and document
+- delete -> array of filenames and document ? (not really important...)
 
 
 
