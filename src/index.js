@@ -1,7 +1,7 @@
 import MESSAGES from './messages'
 import MIMETYPES from './mimetypes'
 import LOGGER from './logger'
-import FileAbstraction from './file';
+import SavedFile from './file';
 
 const EMPTY_FUNC = () => {}
 let SELF = null
@@ -50,7 +50,7 @@ class BrowserFileStorage {
                 let dbName = (namespace && typeof namespace === 'string') ? SELF._idb_name + '_' + namespace : SELF._idb_name
                 SELF._opendb(dbName, (err, successObj) => {
                     if(err) {
-                        LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_COULD_NOT_OPEN, { dbError: true, errorText: err.error, dbObject : err })
+                        LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_COULD_NOT_OPEN, { dbError: true, errorText: err.error, e: err })
                         return reject({ dbError: true, errorText: err.error, supported: true })
                     }
 
@@ -158,9 +158,9 @@ class BrowserFileStorage {
     /**
      * Saves a file to the database
      * @param {string} filename - Acts as a unique identifier for the stored file, extension may be used to determine mimetype automatically.
-     * @param {string | Blob | FileAbstraction} contents - raw contents of the file.
+     * @param {string | Blob | SavedFile} contents - raw contents of the file.
      * @param {string} [mimetype] - Optionally force a mimetype on the saved file, regardless of extension or if a blob already has a mimetype.
-     * @returns {Promise} - Returns a Promise which resolves if the file is saved properly. 
+     * @returns {Promise} - Returns a Promise which resolves with the SavedFile object that was saved.  
      */
     save (filename, contents, mimetype) {
         return new Promise((resolve, reject) => {
@@ -189,56 +189,57 @@ class BrowserFileStorage {
             let addRequest = objectStore.put(fileToSave._toIDB())
 
             addRequest.onsuccess = (event) => {
-                LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_SAVE_SUCCESS, { event: event })
+                LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_SAVE_SUCCESS, { file: fileToSave, e: event })
                 return resolve(fileToSave)
             }
 
             addRequest.onerror = (event) => {
-                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_SAVE_FAIL, { event: event })
-                return reject({ dbError: true, errorText: transaction.error })
+                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_SAVE_FAIL, { e: event })
+                return reject({ init: true, dbError: true, errorText: transaction.error })
             }
         })
     }
 
-    // filename, onSuccess, onFail
-    load (params) {
-        params = params || {}
-        let onSuccess = params.onSuccess || EMPTY_FUNC
-        let onFail = params.onFail || EMPTY_FUNC
-        let filename = params.filename
-
-        if(!SELF._init) {
-            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'load'})
-            onFail({message: MESSAGES.IDB_NOT_INIT})
-            return
-        }
-
-        if(!filename || typeof filename !== 'string' || filename.length < 1) {
-            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_BAD_FILENAME, {method: 'load', filename: filename})
-            onFail({message: MESSAGES.IDB_BAD_FILENAME, errors: {filename: true} })
-            return
-        }
-
-        let transaction = SELF._db.transaction(["files"])
-        let objectStore = transaction.objectStore("files")
-        let request = objectStore.get(filename)
-
-        request.onsuccess = (event) => {
-            // Do something with the request.result!
-            if(request.result) {
-                let fileToLoad = new FileAbstraction(request.result)
-                LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_LOAD_SUCCESS, {file: fileToLoad, event: event, request: request})
-                onSuccess(fileToLoad, {event: event, request: request})
-            } else {
-                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_FIND_FAIL, {event: event, request: request, errors: {notFound: true} })
-                onFail({message: MESSAGES.IDB_LOAD_FIND_FAIL, event: event, request: request, errors: {notFound: true} })
+    // Load will access the inner database
+    // @TODO: Allow array of files to be loaded? needs to rework internals for that! how to know what resolved? what if only one file didn't load.?
+    /**
+     * Saves a file to the database
+     * @param {string} filename - Acts as a unique identifier for the stored file
+     * @returns {Promise} - Returns a Promise which resolves if the file is loaded properly with the SavedFile object. 
+     */
+    load (filename) {
+        return new Promise((resolve, reject) => {
+            if(!SELF._init) {
+                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'load'})
+                return reject({ init: false })
             }
-        }
 
-        request.onerror = (event) => {
-            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_FAIL, {event: event, request: request, errors: {db: true}})
-            onFail({message: MESSAGES.IDB_LOAD_FAIL, event: event, request: request, errors: {db: true}})
-        }
+            if(!filename || typeof filename !== 'string' || filename.length < 1) {
+                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_BAD_FILENAME, { invalidFilename: true })
+                return reject({ init: true, invalidFilename: true })
+            }
+
+            let transaction = SELF._db.transaction(["files"])
+            let objectStore = transaction.objectStore("files")
+            let request = objectStore.get(filename)
+
+            request.onsuccess = (event) => {
+                // Do something with the request.result!
+                if(request.result) {
+                    let fileToLoad = new SavedFile(request.result)
+                    LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_LOAD_SUCCESS, {file: fileToLoad, e: event })
+                    return resolve(fileToLoad)
+                } else {
+                    LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_FIND_FAIL, { e: event })
+                    return reject({ init: true, notFound: true })
+                }
+            }
+
+            request.onerror = (event) => {
+                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_FAIL, { e: event })
+                return reject({ init: true, dbError: true, errorText: transaction.error })
+            }
+        })
     }
 
     // onSuccess, onFail
@@ -264,12 +265,12 @@ class BrowserFileStorage {
                 let files = []
                 if(!event.target.result[0]) {
                     if(event.target.result && event.target.result.filename) {
-                        files.push(new FileAbstraction(event.target.result))
+                        files.push(new SavedFile(event.target.result))
                     }
                 } else {
                     for(let r in event.target.result) {
                         if(event.target.result[r] && event.target.result[r].filename) {
-                            files.push(new FileAbstraction(event.target.result[r]))
+                            files.push(new SavedFile(event.target.result[r]))
                         }
                     }
                 }
@@ -290,7 +291,7 @@ class BrowserFileStorage {
                 let cursor = event.target.result
                 if (cursor) {
                     if(cursor.value && cursor.value.filename) {
-                        files.push(new FileAbstraction(cursor.value))
+                        files.push(new SavedFile(cursor.value))
                     }
                     cursor.continue()
                 } else {
@@ -419,7 +420,7 @@ class BrowserFileStorage {
                     newBlob = new Blob([contents], {type: givenMimeType})
                 }
             }
-        } else if (contents instanceof FileAbstraction) {
+        } else if (contents instanceof SavedFile) {
             if(!givenMimeType) {
                 if(existingMime) {
                     newBlob = new Blob([contents.blob], {type: existingMime})
@@ -434,7 +435,7 @@ class BrowserFileStorage {
             return null
         }
 
-        let fileToSave = new FileAbstraction({
+        let fileToSave = new SavedFile({
             filename: filename,
             blob: newBlob,
             lastModified: (new Date()).getTime(),

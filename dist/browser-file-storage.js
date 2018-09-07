@@ -180,7 +180,7 @@ var BrowserFileStorage = function () {
                     var dbName = namespace && typeof namespace === 'string' ? SELF._idb_name + '_' + namespace : SELF._idb_name;
                     SELF._opendb(dbName, function (err, successObj) {
                         if (err) {
-                            _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_COULD_NOT_OPEN, { dbError: true, errorText: err.error, dbObject: err });
+                            _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_COULD_NOT_OPEN, { dbError: true, errorText: err.error, e: err });
                             return reject({ dbError: true, errorText: err.error, supported: true });
                         }
 
@@ -250,6 +250,10 @@ var BrowserFileStorage = function () {
         // It will ask or attempt to persist in whatever way the target browser deals with it
         // Persist will always resolve unless the entire class was not initialized.
         // Can check 'persistent' to see if request was approved by user/browser and 'canPersist' to see if it was possible in the first place. 
+        /**
+         * Requests permission to the user/browser for file persistency. 
+         * @returns {Promise} - Returns a Promise which resolves with an object containing persistency status.
+         */
 
     }, {
         key: 'persist',
@@ -284,9 +288,9 @@ var BrowserFileStorage = function () {
         /**
          * Saves a file to the database
          * @param {string} filename - Acts as a unique identifier for the stored file, extension may be used to determine mimetype automatically.
-         * @param {string | Blob | FileAbstraction} contents - raw contents of the file.
+         * @param {string | Blob | SavedFile} contents - raw contents of the file.
          * @param {string} [mimetype] - Optionally force a mimetype on the saved file, regardless of extension or if a blob already has a mimetype.
-         * @returns {Promise} - Returns a Promise which resolves if the file is saved properly. 
+         * @returns {Promise} - Returns a Promise which resolves with the SavedFile object that was saved.  
          */
 
     }, {
@@ -318,59 +322,60 @@ var BrowserFileStorage = function () {
                 var addRequest = objectStore.put(fileToSave._toIDB());
 
                 addRequest.onsuccess = function (event) {
-                    _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_SAVE_SUCCESS, { event: event });
+                    _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_SAVE_SUCCESS, { file: fileToSave, e: event });
                     return resolve(fileToSave);
                 };
 
                 addRequest.onerror = function (event) {
-                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_SAVE_FAIL, { event: event });
-                    return reject({ dbError: true, errorText: transaction.error });
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_SAVE_FAIL, { e: event });
+                    return reject({ init: true, dbError: true, errorText: transaction.error });
                 };
             });
         }
 
-        // filename, onSuccess, onFail
+        // Load will access the inner database
+        // @TODO: Allow array of files to be loaded? needs to rework internals for that! how to know what resolved? what if only one file didn't load.?
+        /**
+         * Saves a file to the database
+         * @param {string} filename - Acts as a unique identifier for the stored file
+         * @returns {Promise} - Returns a Promise which resolves if the file is loaded properly with the SavedFile object. 
+         */
 
     }, {
         key: 'load',
-        value: function load(params) {
-            params = params || {};
-            var onSuccess = params.onSuccess || EMPTY_FUNC;
-            var onFail = params.onFail || EMPTY_FUNC;
-            var filename = params.filename;
-
-            if (!SELF._init) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'load' });
-                onFail({ message: _messages2.default.IDB_NOT_INIT });
-                return;
-            }
-
-            if (!filename || typeof filename !== 'string' || filename.length < 1) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_BAD_FILENAME, { method: 'load', filename: filename });
-                onFail({ message: _messages2.default.IDB_BAD_FILENAME, errors: { filename: true } });
-                return;
-            }
-
-            var transaction = SELF._db.transaction(["files"]);
-            var objectStore = transaction.objectStore("files");
-            var request = objectStore.get(filename);
-
-            request.onsuccess = function (event) {
-                // Do something with the request.result!
-                if (request.result) {
-                    var fileToLoad = new _file2.default(request.result);
-                    _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_LOAD_SUCCESS, { file: fileToLoad, event: event, request: request });
-                    onSuccess(fileToLoad, { event: event, request: request });
-                } else {
-                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_FIND_FAIL, { event: event, request: request, errors: { notFound: true } });
-                    onFail({ message: _messages2.default.IDB_LOAD_FIND_FAIL, event: event, request: request, errors: { notFound: true } });
+        value: function load(filename) {
+            return new Promise(function (resolve, reject) {
+                if (!SELF._init) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'load' });
+                    return reject({ init: false });
                 }
-            };
 
-            request.onerror = function (event) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_FAIL, { event: event, request: request, errors: { db: true } });
-                onFail({ message: _messages2.default.IDB_LOAD_FAIL, event: event, request: request, errors: { db: true } });
-            };
+                if (!filename || typeof filename !== 'string' || filename.length < 1) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_BAD_FILENAME, { invalidFilename: true });
+                    return reject({ init: true, invalidFilename: true });
+                }
+
+                var transaction = SELF._db.transaction(["files"]);
+                var objectStore = transaction.objectStore("files");
+                var request = objectStore.get(filename);
+
+                request.onsuccess = function (event) {
+                    // Do something with the request.result!
+                    if (request.result) {
+                        var fileToLoad = new _file2.default(request.result);
+                        _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_LOAD_SUCCESS, { file: fileToLoad, e: event });
+                        return resolve(fileToLoad);
+                    } else {
+                        _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_FIND_FAIL, { e: event });
+                        return reject({ init: true, notFound: true });
+                    }
+                };
+
+                request.onerror = function (event) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_FAIL, { e: event });
+                    return reject({ init: true, dbError: true, errorText: transaction.error });
+                };
+            });
         }
 
         // onSuccess, onFail
@@ -817,9 +822,9 @@ var _createClass = function () { function defineProperties(target, props) { for 
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var FileAbstraction = function () {
-    function FileAbstraction(props) {
-        _classCallCheck(this, FileAbstraction);
+var SavedFile = function () {
+    function SavedFile(props) {
+        _classCallCheck(this, SavedFile);
 
         this.filename = props.filename;
         this.lastModified = props.lastModified;
@@ -828,8 +833,8 @@ var FileAbstraction = function () {
         this.size = props.size;
     }
 
-    _createClass(FileAbstraction, [{
-        key: "_toIDB",
+    _createClass(SavedFile, [{
+        key: '_toIDB',
         value: function _toIDB() {
             return {
                 filename: this.filename,
@@ -840,7 +845,7 @@ var FileAbstraction = function () {
             };
         }
     }, {
-        key: "createURL",
+        key: 'createURL',
         value: function createURL() {
             if (this._createdURL) {
                 return this._createdURL;
@@ -849,7 +854,7 @@ var FileAbstraction = function () {
             return this._createdURL;
         }
     }, {
-        key: "destroyURL",
+        key: 'destroyURL',
         value: function destroyURL() {
             if (this._createdURL) {
                 URL.revokeObjectURL(this._createdURL);
@@ -857,14 +862,58 @@ var FileAbstraction = function () {
             }
         }
     }, {
-        key: "toString",
-        value: function toString() {}
+        key: '_toSomething',
+        value: function _toSomething(mode) {
+            var _this = this;
+
+            return new Promise(function (resolve, reject) {
+                if (FileReader) {
+                    var reader = new FileReader();
+
+                    if (!_this.blob) {
+                        return reject({ supported: true, fileError: true });
+                    }
+
+                    reader.addEventListener('loadend', function (e) {
+                        return resolve(e.srcElement.result);
+                    });
+
+                    reader.addEventListener('error', function (e) {
+                        return reject({ supported: true, readError: true, e: e });
+                    });
+
+                    reader[mode](_this.blob);
+                } else {
+                    return reject({ supported: false });
+                }
+            });
+        }
+    }, {
+        key: 'toString',
+        value: function toString() {
+            return this._toSomething('readAsText');
+        }
+    }, {
+        key: 'toBinaryString',
+        value: function toBinaryString() {
+            return this._toSomething('readAsBinaryString');
+        }
+    }, {
+        key: 'toArrayBuffer',
+        value: function toArrayBuffer() {
+            return this._toSomething('readAsArrayBuffer');
+        }
+    }, {
+        key: 'toDataURL',
+        value: function toDataURL() {
+            return this._toSomething('readAsDataURL');
+        }
     }]);
 
-    return FileAbstraction;
+    return SavedFile;
 }();
 
-exports.default = FileAbstraction;
+exports.default = SavedFile;
 
 /***/ })
 /******/ ]);

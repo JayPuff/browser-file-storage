@@ -1,7 +1,7 @@
 
 
 
-class FileAbstraction {
+class SavedFile {
     constructor(props) {
         this.filename = props.filename
         this.lastModified = props.lastModified
@@ -35,10 +35,46 @@ class FileAbstraction {
         }
     }
 
+    _toSomething (mode) {
+        return new Promise((resolve, reject) => { 
+            if (FileReader) {
+                const reader = new FileReader();
+
+                if(!this.blob) {
+                    return reject({ supported: true, fileError: true })
+                }
+
+                reader.addEventListener('loadend', (e) => {
+                    return resolve(e.srcElement.result)
+                });
+
+                reader.addEventListener('error', (e) => {
+                    return reject({ supported: true, readError: true, e: e })
+                });
+
+                reader[mode](this.blob);
+            } else {
+                return reject({ supported: false })
+            }
+        })
+    }
+
     toString () {
-        
+        return this._toSomething('readAsText')
+    }
+
+    toBinaryString () {
+        return this._toSomething('readAsBinaryString')
+    }
+
+    toArrayBuffer () {
+        return this._toSomething('readAsArrayBuffer')
+    }
+
+    toDataURL () {
+        return this._toSomething('readAsDataURL')
     }
 }
 
 
-export default FileAbstraction
+export default SavedFile
