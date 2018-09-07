@@ -83,7 +83,43 @@ browserFileStorage.persist().then((status) => {
 
 ## Saving a file
 
-...
+Save takes two mandatory parameters: *filename and contents*
+Save also takes an optional third parameter: *mimetype*
+
+*filename* is a string and will be used as identifier to save and load the file from the inner database. the extension in the filename will also be used if possible to auto-detect the mimetype of the file, unless the contents we are storing is a blob with an already existing mimetype, or if the third optional parameter *mimetype* is set (In which case mimetype will be forced to whatever was specified on that third parameter)
+
+*contents* can be a raw string, a blob, a FileAbstraction (Type used internally to unify what we save and load from browserFileStorage)
+
+```javascript
+const data = { preferences: { notifications: "off" } }
+browserFileStorage.save('local.json', JSON.stringify(data)).then((savedFile) => {
+    // Parameter savedFile contains an object of type FileAbstraction.
+    // It is the same object type returned upon loading a file from browserStorage.
+
+        // ... File saved successfully. 
+    console.log('File Saved successfully!', savedFile)
+}).catch((error) => {
+    if(!error.init) {
+        // ... browserFileStorage was not initialized yet.
+    }
+
+    if(error.invalidFilename) {
+        // ... Error with filename... It is either empty, null, or not a string.
+    }
+
+    if(error.invalidContents) {
+        // ... Error with contents... They are empty, or not what expected... Blob, String, FileAbstraction, etc.
+    }
+
+    if(error.dbError) {
+        // ... Internal IndexedDB error! Oh no! Failed to save.
+
+        // ... What was the problem exactly?
+        console.error(error.errorText)
+    }
+
+})
+```
 
 
 # Capacity

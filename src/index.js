@@ -122,6 +122,10 @@ class BrowserFileStorage {
     // It will ask or attempt to persist in whatever way the target browser deals with it
     // Persist will always resolve unless the entire class was not initialized.
     // Can check 'persistent' to see if request was approved by user/browser and 'canPersist' to see if it was possible in the first place. 
+    /**
+     * Requests permission to the user/browser for file persistency. 
+     * @returns {Promise} - Returns a Promise which resolves with an object containing persistency status.
+     */
     persist () {
         return new Promise((resolve, reject) => {
             if(!SELF._init) {
@@ -150,7 +154,7 @@ class BrowserFileStorage {
     // Save is in charge of taking any type of input and converting it to a common format for storing into the inner database
     // A file will be saved, and in order to access it and load it, the filename will be the 'key'
     // By default, same filename being used will overwrite whatever was there previously with no warning.
-    // @TODO: overwrite global option?, accept file input dialog thing, accept base64 string, accept dom element?
+    // @TODO: overwrite global option?, accept file input dialog thing, accept base64 string, accept js object -> stringify??, accept dom element?
     /**
      * Saves a file to the database
      * @param {string} filename - Acts as a unique identifier for the stored file, extension may be used to determine mimetype automatically.
@@ -186,7 +190,7 @@ class BrowserFileStorage {
 
             addRequest.onsuccess = (event) => {
                 LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_SAVE_SUCCESS, { event: event })
-                return resolve({})
+                return resolve(fileToSave)
             }
 
             addRequest.onerror = (event) => {

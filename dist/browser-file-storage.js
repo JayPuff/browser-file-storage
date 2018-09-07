@@ -180,8 +180,8 @@ var BrowserFileStorage = function () {
                     var dbName = namespace && typeof namespace === 'string' ? SELF._idb_name + '_' + namespace : SELF._idb_name;
                     SELF._opendb(dbName, function (err, successObj) {
                         if (err) {
-                            _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_COULD_NOT_OPEN, { dbError: true, error: err.error, dbObject: err });
-                            return reject({ dbError: true, error: err.error, supported: true });
+                            _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_COULD_NOT_OPEN, { dbError: true, errorText: err.error, dbObject: err });
+                            return reject({ dbError: true, errorText: err.error, supported: true });
                         }
 
                         SELF._init = true;
@@ -257,7 +257,7 @@ var BrowserFileStorage = function () {
             return new Promise(function (resolve, reject) {
                 if (!SELF._init) {
                     _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'persist' });
-                    return reject({ message: _messages2.default.IDB_NOT_INIT });
+                    return reject({ message: _messages2.default.IDB_NOT_INIT, init: false });
                 }
 
                 if (navigator.storage && navigator.storage.persist) {
@@ -277,67 +277,56 @@ var BrowserFileStorage = function () {
             });
         }
 
-        // Force the mode?
-        // Auto detect if possible
-        // mime types? can extract ext name from filename and map it to list of mime types.
-        // Does this overwrite by default? probably.
-        // base 64???
-        // blob
-        // fileupload
-        // raw binary... string???
+        // Save is in charge of taking any type of input and converting it to a common format for storing into the inner database
+        // A file will be saved, and in order to access it and load it, the filename will be the 'key'
+        // By default, same filename being used will overwrite whatever was there previously with no warning.
+        // @TODO: overwrite global option?, accept file input dialog thing, accept base64 string, accept js object -> stringify??, accept dom element?
+        /**
+         * Saves a file to the database
+         * @param {string} filename - Acts as a unique identifier for the stored file, extension may be used to determine mimetype automatically.
+         * @param {string | Blob | FileAbstraction} contents - raw contents of the file.
+         * @param {string} [mimetype] - Optionally force a mimetype on the saved file, regardless of extension or if a blob already has a mimetype.
+         * @returns {Promise} - Returns a Promise which resolves if the file is saved properly. 
+         */
 
     }, {
         key: 'save',
-        value: function save(params) {
-            params = params || {};
-            var onSuccess = params.onSuccess || EMPTY_FUNC;
-            var onFail = params.onFail || EMPTY_FUNC;
-            var contents = params.contents;
-            var filename = params.filename;
-            var mimeType = params.mimeType;
+        value: function save(filename, contents, mimetype) {
+            return new Promise(function (resolve, reject) {
+                // Validation and Blob Creation.
+                if (!SELF._init) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'save' });
+                    return reject({ init: false });
+                }
 
-            // Validation and Blob Creation.
-            if (!SELF._init) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'save' });
-                onFail({ message: _messages2.default.IDB_NOT_INIT });
-                return;
-            }
+                if (!filename || typeof filename !== 'string' || filename.length < 1) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_BAD_FILENAME, { invalidFilename: true });
+                    return reject({ init: true, invalidFilename: true });
+                }
 
-            if (!filename || typeof filename !== 'string' || filename.length < 1) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_BAD_FILENAME, { errors: { filename: true } });
-                onFail({ message: _messages2.default.IDB_BAD_FILENAME, errors: { filename: true } });
-                return;
-            }
+                var fileToSave = SELF._createFileToSave({ filename: filename, contents: contents, mimeType: mimetype });
 
-            if (!contents) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NO_CONTENT, { errors: { filename: false, contents: true } });
-                onFail({ message: _messages2.default.IDB_NO_CONTENT, errors: { filename: false, contents: true } });
-                return;
-            }
+                if (!fileToSave) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_WRONG_CONTENT, { invalidContents: true });
+                    return reject({ init: true, invalidContents: true });
+                }
 
-            var fileToSave = SELF._createFileToSave({ filename: filename, contents: contents, mimeType: mimeType });
+                // Indexed DB implementation
+                var transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite");
+                var objectStore = transaction.objectStore("files");
 
-            if (!fileToSave) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_WRONG_CONTENT, { errors: { filename: false, contents: true, parseToBlob: true } });
-                onFail({ message: _messages2.default.IDB_WRONG_CONTENT, errors: { filename: false, contents: true, parseToBlob: true } });
-                return;
-            }
+                var addRequest = objectStore.put(fileToSave._toIDB());
 
-            // Indexed DB implementation
-            var transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite");
-            var objectStore = transaction.objectStore("files");
+                addRequest.onsuccess = function (event) {
+                    _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_SAVE_SUCCESS, { event: event });
+                    return resolve(fileToSave);
+                };
 
-            var addRequest = objectStore.put(fileToSave._toIDB());
-
-            addRequest.onsuccess = function (event) {
-                _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_SAVE_SUCCESS, { event: event });
-                onSuccess({ message: _messages2.default.IDB_SAVE_SUCCESS, event: event });
-            };
-
-            addRequest.onerror = function (event) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_SAVE_FAIL, { event: event });
-                onFail({ message: _messages2.default.IDB_SAVE_FAIL, event: event, errors: { db: true } });
-            };
+                addRequest.onerror = function (event) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_SAVE_FAIL, { event: event });
+                    return reject({ dbError: true, errorText: transaction.error });
+                };
+            });
         }
 
         // filename, onSuccess, onFail
@@ -528,6 +517,10 @@ var BrowserFileStorage = function () {
                 mimeType = null;
             }
 
+            if (!contents) {
+                return;
+            }
+
             var ext = this._getExtension(filename);
             var existingMime = this._getMimeType(ext);
             var givenMimeType = !mimeType || typeof mimeType !== 'string' || mimeType == '' ? null : mimeType;
@@ -658,8 +651,7 @@ exports.default = {
     IDB_PERSIST_NONE: "Could not ask for persistency. Files have default persistency, browser could remove them.",
 
     IDB_BAD_FILENAME: "Filename is not a string, or is empty.",
-    IDB_NO_CONTENT: "No Content specified.",
-    IDB_WRONG_CONTENT: "Content given is not a string nor blob",
+    IDB_WRONG_CONTENT: "Content given is not valid [String, Blob, or FileAbstraction]",
 
     IDB_SAVE_SUCCESS: "Successfully saved a file to database.",
     IDB_SAVE_FAIL: "Failed at saving file to database.",
