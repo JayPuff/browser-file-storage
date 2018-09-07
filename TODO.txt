@@ -4,6 +4,7 @@
 - finish save definition on what contents can be, and fix on read me when done.. (File (form)? js obj (and json parse... ugh.)? dataurl string? url?)
 - load -> array of filenames, and document
 - delete -> array of filenames and document ? (not really important...)
+- Simple demo in a folder (not the webpack one im using...)
 
 
 
