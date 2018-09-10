@@ -1,7 +1,3 @@
-# IN DEVELOPMENT
-
-IN DEVELOPMENT
-
 # Browser File Storage
 Abstracts the complexity of the IndexedDB Api so that a user can easily save files on the browser.
 
@@ -15,7 +11,7 @@ While there are some local database like libraries to store json objects, advanc
 # Installation
 Installing Package
 ```javascript
-npm install -D browser-file-storage
+npm install browser-file-storage
 ```
 
 Importing in Webpack

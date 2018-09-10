@@ -6,7 +6,9 @@
 - delete -> array of filenames and document ? (not really important...)
 - Simple demo in a folder (not the webpack one im using...)
 
+- md5 hash?
 - jsdoc not working with webpack??? if I put everything in one file and remove webpack will it work?
+- read me
 
 
 
