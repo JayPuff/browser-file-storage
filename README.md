@@ -1,9 +1,11 @@
 # Browser File Storage
 Abstracts the complexity of the IndexedDB Api so that a user can easily save files on the browser.
 
+While there are some local database like libraries to store json objects, advanced queries, replication, etc, this is very focused on a single use case: saving and loading files locally.
+
 # Important
 - Browser must support the IndexedDB API as it cannot be polyfilled: https://caniuse.com/#feat=indexeddb
-- Browser must support promises or a Promise polyfill: https://www.npmjs.com/package/promise-polyfill
+- Browser must support promises or include a Promise polyfill: https://www.npmjs.com/package/promise-polyfill
 - Files saved locally, just like IndexedDB entries, are namespaced by domain by default, don't expect to save a file on one domain and be able to access it from another just because it is the same user's computer accessing your websites.
 
 # Installation
@@ -86,20 +88,39 @@ browserFileStorage.persist().then((status) => {
 Save takes two mandatory parameters: *filename and contents*
 Save also takes an optional third parameter: *mimetype*
 
-*filename* is a string and will be used as identifier to save and load the file from the inner database. the extension in the filename will also be used if possible to auto-detect the mimetype of the file, unless the contents we are storing is a blob with an already existing mimetype, or if the third optional parameter *mimetype* is set (In which case mimetype will be forced to whatever was specified on that third parameter)
+*filename* is a string and will be used as identifier to save and load the file from the inner database. the extension in the filename will also be used if possible to auto-detect the mimetype of the file, unless the content we are storing is a blob with an already existing mimetype, or if the third optional parameter *mimetype* is set (In which case mimetype will be forced to whatever was specified on that third parameter)
 
-*contents* can be a raw string, a blob, a SavedFile (Type used internally to unify what we save and load from browserFileStorage)
+*contents* can be a raw string, a blob, a BrowserFile (Type used internally to unify what we save and load from browserFileStorage)
 
-### In Depth Example
+### Simple Examples
 
 ```javascript
-const data = { preferences: { notifications: "off" } }
-browserFileStorage.save('local.json', JSON.stringify(data)).then((savedFile) => {
-    // Parameter savedFile contains an object of type SavedFile.
-    // It is the same object type returned upon loading a file from browserStorage.
+browserFileStorage.save('settings.txt', 'This is the settings file!').then(((file) => {
+    console.log('Saved file successfully!', file)
+}).catch((error) => {
+    console.log('Could not save the file!', file)
+})
+```
 
-        // ... File saved successfully. 
-    console.log('File Saved successfully!', savedFile)
+```javascript
+// .. use fetch, axios, $.ajax, xhr request, etc to fetch an image blob accordingly...
+browserFileStorage.save('background.png', myImage).then(((file) => {
+    console.log('Saved image successfully!', file)
+}).catch((error) => {
+    console.log('Could not save the image!', file)
+})
+```
+
+### In Depth Example and Error Handling
+
+```javascript
+// Some settings JS object.
+const data = { preferences: { notifications: "off" } }
+const json = JSON.stringify(data)
+
+browserFileStorage.save('settings.json', json ).then((file) => {
+    // ... File saved successfully. 
+    console.log('File Saved successfully!', file)
 }).catch((error) => {
     if(!error.init) {
         // ... browserFileStorage was not initialized yet.
@@ -110,7 +131,7 @@ browserFileStorage.save('local.json', JSON.stringify(data)).then((savedFile) => 
     }
 
     if(error.invalidContents) {
-        // ... Error with contents... They are empty, or not what expected... Blob, String, SavedFile, etc.
+        // ... Error with contents... They are empty, or not what expected... Blob, String, BrowserFile, etc.
     }
 
     if(error.dbError) {
@@ -123,34 +144,72 @@ browserFileStorage.save('local.json', JSON.stringify(data)).then((savedFile) => 
 })
 ```
 
-### Specific Examples
+### More Specific Examples
 
-#### Storing a file fetched using XHR
+[Some specific save examples of different scenarios](#specific-save)
 
-#### Storing a file from upload file input
+## Browser File methods and properties
 
-#### Storing a file's raw content
+When saving or loading a file, it is stored in a *BrowserFile* Object.
 
-#### Storing a file through data URL
+```javascript
+let file = // ... Browser File returned from a load or save's resolved promise.
 
-#### Storing a file from a raw URL (local or web)
+console.log(file.extension) // extension of file.
+console.log(file.filename) // Same as the filename used to load file
+console.log(file.lastModified) // JS timestamp when it was last saved/overwritten
+console.log(file.size) // Size recorded when last stored.
+console.log(file.blob) // Blob Object, this can be turned into a local URL, sent via xhr, etc. This is the actual `file`
+console.log(file.type) // Mimetype
 
+// Create a local URL for the resource. It will return the same url no matter how many times you called unless destroyed.
+let url = file.createURL()
+// Use `url` like you would a regular url within your page.. Ex: change an image tag's src to url, open the url on a new tab, etc
+
+// Delete the created URL, url will no longer work.
+// It will also make createURL() return a new URL
+file.destroyURL()
+
+// Read as Raw String
+file.toString().then((string) => {
+    // .. String contains raw text.
+    console.log(string)
+}).catch((error) => {
+    if(!error.supported) {
+        // ... FileReader Api is not available on this browser!
+    }
+
+    if(error.fileError) {
+        // ... There was an error finding a blob to read internally.
+    }
+
+    if(error.readError) {
+        // ... There was an error reading the file as specified.
+        console.error(error.e) // more details...
+    }
+})
+
+// Read as Binary String, Data URL, Array Buffer...
+// Works the same as 'toString' including all the properties on the error object.
+file.toBinaryString().then((binaryString) => { /* ... */ })
+file.toDataURL().then((dataURL) => { /* ... */ })
+file.toArrayBuffer().then((arrayBuffer) => { /* ... */ })
+```
 
 ## Loading a file
 
-Loading simply takes a filename as an argument and returns a promise that when resolved, contains the SavedFile object.
+Loading simply takes a filename as an argument and returns a promise that when resolved, contains the BrowserFile object.
 
-### Basic Example
-
+### Basic Examples
 ```javascript
-browserFileStorage.load('local.json').then((file) => {
+browserFileStorage.load('settings.json').then((file) => {
     file.toString().then((stringContents) => {
         // .. parse to JSON and begin using ...
         let object = {}
         try {
             object = JSON.parse(stringContents)
         } catch (e) {
-            // Error.
+            // Error Parsing.
         }
         
         console.log(object)
@@ -160,58 +219,24 @@ browserFileStorage.load('local.json').then((file) => {
 })
 ```
 
+```javascript
+browserFileStorage.load('background.png').then((file) => {
+    // Assign image source
+    let image = document.getElementById('someImage')
+    let url = file.createURL()
+    image.src = url
+}).catch((error) => {
+    console.error(error)
+})
+```
 
-### In Depth Example
+
+### In Depth Example and Error Handling
 
 ```javascript
 browserFileStorage.load('example.ico').then((file) => {
     // ... File loaded successfully.
-
-    // Can now use methods and properties from SavedFile object
-    console.log(file.extension) // extension of file.
-    console.log(file.filename) // Same as the filename used to load file
-    console.log(file.lastModified) // JS timestamp when it was last saved/overwritten
-    console.log(file.size) // Size recorded when last stored.
-    console.log(file.blob) // Blob Object
-    console.log(file.blob.type) // Mimetype
-
-    // Send object as a blob through XHR!
-    // ... Using file.blob
-
-    // Create a local URL in order to use file as url... Ex: image.src, open in a tab or frame, download...
-    // Creating more than one URL will keep returning the same url as to not consume too many resources, unless it was deleted.
-    let url = file.createURL()
-    // image.src = url
-
-    // Delete the created URL, url will no longer work.
-    file.destroyURL()
-
-
-    // Read as Raw String
-    file.toString().then((string) => {
-        // .. String contains raw text.
-        console.log(string)
-    }).catch((error) => {
-        if(!error.supported) {
-            // ... FileReader Api is not available on this browser!
-        }
-
-        if(error.fileError) {
-            // ... There was an error finding a blob to read internally.
-        }
-
-        if(error.readError) {
-            // ... There was an error reading the file as specified.
-            console.error(error.e) // more details...
-        }
-    })
-
-    // Read as Binary String, Data URL, Array Buffer...
-    // Works the same as 'toString' including all the properties on the error object.
-    file.toBinaryString().then((binaryString) => { /* ... */ })
-    file.toDataURL().then((dataURL) => { /* ... */ })
-    file.toArrayBuffer().then((arrayBuffer) => { /* ... */ })
-
+    console.log('File Loaded Successfully!', file)
 }).catch((error) => {
     if(!error.init) {
         // ... browserFileStorage was not initialized yet.
@@ -243,3 +268,17 @@ browserFileStorage.load('example.ico').then((file) => {
 # Capacity
 
 ...
+
+# <a name="specific-save"></a> Save specific examples.
+
+### Specific Examples
+
+#### Storing a file fetched using XHR
+
+#### Storing a file from upload file input
+
+#### Storing a file's raw content
+
+#### Storing a file through data URL
+
+#### Storing a file from a raw URL (local or web)

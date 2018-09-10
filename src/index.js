@@ -1,7 +1,7 @@
 import MESSAGES from './messages'
 import MIMETYPES from './mimetypes'
 import LOGGER from './logger'
-import SavedFile from './file';
+import BrowserFile from './file';
 
 const EMPTY_FUNC = () => {} //@TODO: remove.
 let SELF = null // This messes up if end-user uses arrow functions in some cases...
@@ -158,9 +158,9 @@ class BrowserFileStorage {
     /**
      * Saves a file to the database
      * @param {string} filename - Acts as a unique identifier for the stored file, extension may be used to determine mimetype automatically.
-     * @param {string | Blob | SavedFile} contents - raw contents of the file.
+     * @param {string | Blob | BrowserFile} contents - raw contents of the file.
      * @param {string} [mimetype] - Optionally force a mimetype on the saved file, regardless of extension or if a blob already has a mimetype.
-     * @returns {Promise} - Returns a Promise which resolves with the SavedFile object that was saved.  
+     * @returns {Promise} - Returns a Promise which resolves with the BrowserFile object that was saved.  
      */
     save (filename, contents, mimetype) {
         return new Promise((resolve, reject) => {
@@ -205,7 +205,7 @@ class BrowserFileStorage {
     /**
      * Saves a file to the database
      * @param {string} filename - Acts as a unique identifier for the stored file
-     * @returns {Promise} - Returns a Promise which resolves if the file is loaded properly with the SavedFile object. 
+     * @returns {Promise} - Returns a Promise which resolves if the file is loaded properly with the BrowserFile object. 
      */
     load (filename) {
         return new Promise((resolve, reject) => {
@@ -226,7 +226,7 @@ class BrowserFileStorage {
             request.onsuccess = (event) => {
                 // Do something with the request.result!
                 if(request.result) {
-                    let fileToLoad = new SavedFile(request.result)
+                    let fileToLoad = new BrowserFile(request.result)
                     LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_LOAD_SUCCESS, {file: fileToLoad, e: event })
                     return resolve(fileToLoad)
                 } else {
@@ -265,12 +265,12 @@ class BrowserFileStorage {
                 let files = []
                 if(!event.target.result[0]) {
                     if(event.target.result && event.target.result.filename) {
-                        files.push(new SavedFile(event.target.result))
+                        files.push(new BrowserFile(event.target.result))
                     }
                 } else {
                     for(let r in event.target.result) {
                         if(event.target.result[r] && event.target.result[r].filename) {
-                            files.push(new SavedFile(event.target.result[r]))
+                            files.push(new BrowserFile(event.target.result[r]))
                         }
                     }
                 }
@@ -291,7 +291,7 @@ class BrowserFileStorage {
                 let cursor = event.target.result
                 if (cursor) {
                     if(cursor.value && cursor.value.filename) {
-                        files.push(new SavedFile(cursor.value))
+                        files.push(new BrowserFile(cursor.value))
                     }
                     cursor.continue()
                 } else {
@@ -420,7 +420,7 @@ class BrowserFileStorage {
                     newBlob = new Blob([contents], {type: givenMimeType})
                 }
             }
-        } else if (contents instanceof SavedFile) {
+        } else if (contents instanceof BrowserFile) {
             if(!givenMimeType) {
                 if(existingMime) {
                     newBlob = new Blob([contents.blob], {type: existingMime})
@@ -435,12 +435,13 @@ class BrowserFileStorage {
             return null
         }
 
-        let fileToSave = new SavedFile({
+        let fileToSave = new BrowserFile({
             filename: filename,
             blob: newBlob,
             lastModified: (new Date()).getTime(),
             extension: ext,
-            size: newBlob.size
+            size: newBlob.size,
+            type: newBlob.type
         })
 
         return fileToSave

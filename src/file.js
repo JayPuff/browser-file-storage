@@ -1,13 +1,14 @@
 
 
 
-class SavedFile {
+class BrowserFile {
     constructor(props) {
         this.filename = props.filename
         this.lastModified = props.lastModified
         this.blob = props.blob
         this.extension = props.extension
         this.size = props.size
+        this.type = props.type
     }
 
     _toIDB () {
@@ -17,6 +18,7 @@ class SavedFile {
             blob: this.blob,
             extension: this.extension,
             size: this.size,
+            type: this.type
         }
     }
 
@@ -77,4 +79,4 @@ class SavedFile {
 }
 
 
-export default SavedFile
+export default BrowserFile
