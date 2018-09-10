@@ -2,7 +2,7 @@
   "name": "browser-file-storage",
   "version": "1.0.0",
   "description": "Abstracts the complexity of indexed DB so that a user can easily save files/blobs by key/filename on the browser",
-  "main": "browser-file-storage.js",
+  "main": "dist/browser-file-storage.js",
   "scripts": {
     "build": "rimraf ./dist && webpack --config ./webpack.config.js --mode production && webpack --config ./webpack.config.js --mode production --minimize"
   },
@@ -34,5 +34,6 @@
     "rimraf": "^2.6.2",
     "webpack": "^4.17.2",
     "webpack-cli": "^3.1.0"
-  }
+  },
+  "dependencies": {}
 }

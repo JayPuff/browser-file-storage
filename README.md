@@ -1,3 +1,7 @@
+# IN DEVELOPMENT
+
+IN DEVELOPMENT
+
 # Browser File Storage
 Abstracts the complexity of the IndexedDB Api so that a user can easily save files on the browser.
 
@@ -20,7 +24,7 @@ import browserFileStorage from 'browser-file-storage'
 ```
 
 Importing through script tag  
-*To be found in the builds folder*
+*To be found in the builds folder or the dist folder*
 ```html
 <script type="text/javascript" src="browser-file-storage.min.js"> 
 ```
@@ -56,8 +60,8 @@ browserFileStorage.init('MY_AMAZING_APP').then((status) => {
     if(error.dbError) {
         // ... Internal IndexedDB error! Oh no! Failed to initialize.
 
-        // ... What was the problem exactly?
-        console.error(error.errorText)
+        // ... What was the problem exactly? (Error Object)
+        console.error(error.error)
     }
 })
 ```
@@ -98,7 +102,7 @@ Save also takes an optional third parameter: *mimetype*
 browserFileStorage.save('settings.txt', 'This is the settings file!').then(((file) => {
     console.log('Saved file successfully!', file)
 }).catch((error) => {
-    console.log('Could not save the file!', file)
+    console.error('Could not save the file!', file)
 })
 ```
 
@@ -107,7 +111,7 @@ browserFileStorage.save('settings.txt', 'This is the settings file!').then(((fil
 browserFileStorage.save('background.png', myImage).then(((file) => {
     console.log('Saved image successfully!', file)
 }).catch((error) => {
-    console.log('Could not save the image!', file)
+    console.error('Could not save the image!', file)
 })
 ```
 
@@ -137,12 +141,19 @@ browserFileStorage.save('settings.json', json ).then((file) => {
     if(error.dbError) {
         // ... Internal IndexedDB error! Oh no! Failed to save.
 
-        // ... What was the problem exactly?
-        console.error(error.errorText)
+        // ... What was the problem exactly? (Error Object)
+        console.error(error.error)
     }
 
 })
 ```
+
+### Auto-Assigned MimeType
+
+If save received a raw string, or blob with no mimetype, it will try to match the extension from the filename to a known mimetype.
+Since there are LOTS of mimetypes, we only detect some of the most common types, other wise files default to *text/plain* or *application/octet-stream*
+
+If you want to make sure your file is saved with the proper mimetype, so that when it is loaded again it can be read by the browser as you want it to, simply pass a third parameter to the save function with the mimetype; This will force the internal blob to that type **Even if the blob was already typed**
 
 ### More Specific Examples
 
@@ -202,6 +213,17 @@ Loading simply takes a filename as an argument and returns a promise that when r
 
 ### Basic Examples
 ```javascript
+browserFileStorage.load('background.png').then((file) => {
+    // Assign image source
+    let image = document.getElementById('someImage')
+    let url = file.createURL()
+    image.src = url
+}).catch((error) => {
+    console.error(error)
+})
+```
+
+```javascript
 browserFileStorage.load('settings.json').then((file) => {
     file.toString().then((stringContents) => {
         // .. parse to JSON and begin using ...
@@ -219,22 +241,9 @@ browserFileStorage.load('settings.json').then((file) => {
 })
 ```
 
-```javascript
-browserFileStorage.load('background.png').then((file) => {
-    // Assign image source
-    let image = document.getElementById('someImage')
-    let url = file.createURL()
-    image.src = url
-}).catch((error) => {
-    console.error(error)
-})
-```
-
-
 ### In Depth Example and Error Handling
-
 ```javascript
-browserFileStorage.load('example.ico').then((file) => {
+browserFileStorage.load('favicon.ico').then((file) => {
     // ... File loaded successfully.
     console.log('File Loaded Successfully!', file)
 }).catch((error) => {
@@ -253,32 +262,193 @@ browserFileStorage.load('example.ico').then((file) => {
     if(error.dbError) {
         // ... Internal IndexedDB error! Oh no! Failed to load.
 
-        // ... What was the problem exactly?
-        console.error(error.errorText)
+        // ... What was the problem exactly? (Error Object)
+        console.error(error.error)
     }
 })
+```
 
+## Loading All Files
+
+If you want to load all files, they will be returned as an array of BrowserFile objects.
+
+
+### Basic Example
+```javascript
+browserFileStorage.loadAll().then((files) => {
+    for(let f in files) {
+        console.log('Loaded a file: ', files[f])
+    }
+}).catch((error) => {
+    console.error(error)
+})
+```
+
+### In Depth Example and Error Handling
+```javascript
+browserFileStorage.loadAll().then((files) => {
+    // ... Append all locally stored PNGs to document body.
+    for(let f in files) {
+        let file = files[f]
+
+        if(file.type === 'image/png') {
+            let image = document.createElement('img')
+            image.src = file.createURL()
+            document.body.appendChild(image)
+        }
+    }
+}).catch((error) => {
+    if(!error.init) {
+        // ... browserFileStorage was not initialized yet.
+    }
+
+    if(error.dbError) {
+        // ... Internal IndexedDB error! Oh no! Failed to load all files.
+
+        // ... What was the problem exactly? (Error Object)
+        console.error(error.error)
+    }
+})
+```
+
+## Deleting a file
+
+Delete takes a filename and resolves once the file is no longer there. It will resolve regardless of if the file existed in the first place or not.
+
+### Basic Example
+```javascript
+browserFileStorage.delete('favicon.ico').then(() => {
+    console.log('Favicon.ico no longer exists locally!')
+}).catch((error) => {
+    console.error(error)
+})
+```
+
+### In Depth Example and Error Handling
+```javascript
+browserFileStorage.delete('settings.json').then(() => {
+    // ... Delete does not resolve with any particular value.
+    console.log('settings.json no longer exists locally!')
+}).catch((error) => {
+    if(!error.init) {
+        // ... browserFileStorage was not initialized yet.
+    }
+
+    if(error.invalidFilename) {
+        // ... Error with filename... It is either empty, null, or not a string.
+    }
+
+    if(error.dbError) {
+        // ... Internal IndexedDB error! Oh no! Failed to load.
+
+        // ... What was the problem exactly? (Error Object)
+        console.error(error.error)
+    }
+})
+```
+
+## Deleting All Files
+
+### Basic Example
+```javascript
+browserFileStorage.deleteAll().then(() => {
+    console.log('Deleted All Files!')
+}).catch((error) => {
+    console.error(error)
+})
+```
+
+### In Depth Example and Error Handling
+```javascript
+browserFileStorage.deleteAll().then(() => {
+   console.log('Deleted All Files!')
+}).catch((error) => {
+    if(!error.init) {
+        // ... browserFileStorage was not initialized yet.
+    }
+
+    if(error.dbError) {
+        // ... Internal IndexedDB error! Oh no! Failed to load all files.
+
+        // ... What was the problem exactly? (Error Object)
+        console.error(error.error)
+    }
+})
 ```
 
 
-
-
-
-
 # Capacity
+
+Storage allowed for the inner IndexedDB Api is surprisingly high, specially when persisted, but it is very browser dependent.
+https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Browser_storage_limits_and_eviction_criteria
 
 ...
 
 # <a name="specific-save"></a> Save specific examples.
 
-### Specific Examples
+## Storing a file fetched using XHR
+```javascript
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'static/icon-source.png', true);
 
-#### Storing a file fetched using XHR
+xhr.responseType = 'blob';
 
-#### Storing a file from upload file input
+xhr.onload = function(e) {
+  if (this.status == 200) {
+    var blob = this.response;
+    browserFileStorage.save('icon-source.png', blob).then((file) => {
+        console.log('Saved file!', file)
+    })
+    .catch((error) => {
+        console.error(error)
+    })
+  }
+};
 
-#### Storing a file's raw content
+xhr.onerror = function(e) {
+  alert("Error " + e.target.status + " occurred while receiving the document.");
+};
 
-#### Storing a file through data URL
+xhr.send();
+```
 
-#### Storing a file from a raw URL (local or web)
+## Storing a file fetched using XHR (axios)
+```javascript
+axios({
+    url: 'static/icon-source.png',
+    method: 'GET',
+    responseType: 'blob'
+}).then((response) => {
+
+    browserFileStorage.save('icon-source.png',response.data).then((file) => {
+        console.log('Saved file!', file)
+    })
+    .catch((error) => {
+        console.error(error)
+    })
+
+}).catch((error) => [
+    console.error(error)
+])
+
+```
+
+## Storing a file from upload file input
+```javascript
+// file-upload is an existing input element of type `file`
+let fileInput = document.getElementById('file-upload')
+
+fileInput.addEventListener('change', (e) => {
+    let files = e.target.files
+    let file = files ? files[0] : null
+    if(file) {
+        browserFileStorage.save(file.name, file).then((savedFile) => {
+            console.log('saved file! - ', savedFile)
+        }).catch(error => {
+            console.error(error)
+        })
+    } else {
+        console.log('no file...')
+    }
+})
+```

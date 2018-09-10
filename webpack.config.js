@@ -20,5 +20,5 @@ module.exports = (env, argv) => ({
     },
     optimization: {
         minimize: (argv.minimize) ? true : false
-    },
+    }
 })

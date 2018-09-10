@@ -3,7 +3,6 @@ import MIMETYPES from './mimetypes'
 import LOGGER from './logger'
 import BrowserFile from './file';
 
-const EMPTY_FUNC = () => {} //@TODO: remove.
 let SELF = null // This messes up if end-user uses arrow functions in some cases...
 
 // *************************** //
@@ -50,8 +49,8 @@ class BrowserFileStorage {
                 let dbName = (namespace && typeof namespace === 'string') ? SELF._idb_name + '_' + namespace : SELF._idb_name
                 SELF._opendb(dbName, (err, successObj) => {
                     if(err) {
-                        LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_COULD_NOT_OPEN, { dbError: true, errorText: err.error, e: err })
-                        return reject({ dbError: true, errorText: err.error, supported: true })
+                        LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_COULD_NOT_OPEN, { dbError: true, error: err.error, e: err })
+                        return reject({ dbError: true, error: err.error, supported: true })
                     }
 
                     SELF._init = true
@@ -65,58 +64,6 @@ class BrowserFileStorage {
             }
         })
     }
-
-    _opendb (name, callback, version) {
-        let request = null
-        let upgrade = false
-        let initial = false
-        let updateVersions = {old: null, new: null} 
-        if(version) {
-            request = SELF._idb.open(name, version)
-        } else {
-            request = SELF._idb.open(name)
-        }
-
-        request.onerror = (event) => {
-            callback({ error: request.error, event: event, request: request })
-        }
-
-        request.onsuccess = (event) => {
-            SELF._db = request.result
-            callback(null, { db: request.result, request: request, event: event, upgrade: upgrade, initial: initial, versions: updateVersions })
-        };
-
-        request.onupgradeneeded = (event) => {
-            upgrade = true
-            LOGGER.log(LOGGER.LEVEL_WARN, MESSAGES.IDB_WILL_UPGRADE, {})
-
-            SELF._db = event.target.result
-            let transaction = event.target.transaction
-
-            function storeCreateIndex (objectStore, name, options) {
-                if (!objectStore.indexNames.contains(name)) {
-                    objectStore.createIndex(name, name, options);
-                }
-            }
-
-
-            let filesStore
-            if(event.oldVersion != 0 && event.oldVersion != event.newVersion) {
-                updateVersions.old = event.oldVersion
-                updateVersions.new = event.newVersion
-                // Actual Upgrade
-                filesStore = transaction.objectStore('files')
-            } else {
-                // First time initializing DB
-                initial = true
-                filesStore = SELF._db.createObjectStore("files", { keyPath: "filename" })
-            }
-            
-            storeCreateIndex(filesStore, 'filename', { unique: false } )
-            storeCreateIndex(filesStore, 'modified', { unique: false } )
-        };
-    }
-
 
     // Persist takes no arguments.
     // It will ask or attempt to persist in whatever way the target browser deals with it
@@ -195,22 +142,21 @@ class BrowserFileStorage {
 
             addRequest.onerror = (event) => {
                 LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_SAVE_FAIL, { e: event })
-                return reject({ init: true, dbError: true, errorText: transaction.error })
+                return reject({ init: true, dbError: true, error: addRequest.error })
             }
         })
     }
 
-    // Load will access the inner database
-    // @TODO: Allow array of files to be loaded? needs to rework internals for that! how to know what resolved? what if only one file didn't load.?
+    // Load will access the inner database and fetch the file as a BrowserFile object
     /**
-     * Saves a file to the database
+     * Loads a file from the database.
      * @param {string} filename - Acts as a unique identifier for the stored file
      * @returns {Promise} - Returns a Promise which resolves if the file is loaded properly with the BrowserFile object. 
      */
     load (filename) {
         return new Promise((resolve, reject) => {
             if(!SELF._init) {
-                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'load'})
+                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, { method: 'load' })
                 return reject({ init: false })
             }
 
@@ -237,137 +183,140 @@ class BrowserFileStorage {
 
             request.onerror = (event) => {
                 LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_FAIL, { e: event })
-                return reject({ init: true, dbError: true, errorText: transaction.error })
+                return reject({ init: true, dbError: true, error: request.error })
             }
         })
     }
 
-    // onSuccess, onFail
-    loadAll (params) {
-        params = params || {}
-        let onSuccess = params.onSuccess || EMPTY_FUNC
-        let onFail = params.onFail || EMPTY_FUNC
+    // Load All will load all existing saved files into an array of BrowserFile
+    /**
+     * Returns all currently saved files 
+     * @returns {Promise} - Returns a Promise which resolves with an array containing all saved files.
+     */
+    loadAll () {
+        return new Promise((resolve, reject) => {
+            if(!SELF._init) {
+                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, { method: 'loadAll' })
+                return reject({ init: false })
+            }
 
-        if(!SELF._init) {
-            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'loadAll'})
-            onFail({message: MESSAGES.IDB_NOT_INIT})
-            return
-        }
+            let transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite")
+            let objectStore = transaction.objectStore("files")
 
-        let transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite")
-        let objectStore = transaction.objectStore("files")
-
-        if(objectStore.getAll) {
-            // Parameters for getAll (query, maxToReturnIfOver1)
-            let getRequest = objectStore.getAll()
-            
-            getRequest.onsuccess = function(event) {
-                let files = []
-                if(!event.target.result[0]) {
-                    if(event.target.result && event.target.result.filename) {
-                        files.push(new BrowserFile(event.target.result))
-                    }
-                } else {
-                    for(let r in event.target.result) {
-                        if(event.target.result[r] && event.target.result[r].filename) {
-                            files.push(new BrowserFile(event.target.result[r]))
+            if(objectStore.getAll) {
+                // Parameters for getAll (query, maxToReturnIfOver1)
+                let getRequest = objectStore.getAll()
+                
+                getRequest.onsuccess = function(event) {
+                    let files = []
+                    if(!event.target.result[0]) {
+                        if(event.target.result && event.target.result.filename) {
+                            files.push(new BrowserFile(event.target.result))
+                        }
+                    } else {
+                        for(let r in event.target.result) {
+                            if(event.target.result[r] && event.target.result[r].filename) {
+                                files.push(new BrowserFile(event.target.result[r]))
+                            }
                         }
                     }
+                    LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_LOAD_ALL_SUCCESS, { files: files })
+                    return resolve(files)
                 }
-                LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_LOAD_ALL_SUCCESS, {files: files, event: event, request: getRequest})
-                onSuccess(files, {message: MESSAGES.IDB_LOAD_ALL_SUCCESS, event: event, request: getRequest})
-            }
 
-            getRequest.onerror = function(event) {
-                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_ALL_FAIL, {event: event, request: getRequest, errors: {db: true}})
-                onFail({message: MESSAGES.IDB_LOAD_ALL_FAIL, event: event, request: getRequest, errors: {db: true}})
-            }
-        } else {
-            // Fallback to the traditional cursor approach if getAll isn't supported.
-            let files = []
-            let cursorRequest = objectStore.openCursor()
-            
-            cursorRequest.onsuccess = function(event) {
-                let cursor = event.target.result
-                if (cursor) {
-                    if(cursor.value && cursor.value.filename) {
-                        files.push(new BrowserFile(cursor.value))
+                getRequest.onerror = function(event) {
+                    LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_ALL_FAIL, { e: event })
+                    return reject({ init: true, dbError: true, error: getRequest.error })
+                }
+            } else {
+                // Fallback to the traditional cursor approach if getAll isn't supported.
+                let files = []
+                let cursorRequest = objectStore.openCursor()
+                
+                cursorRequest.onsuccess = function(event) {
+                    let cursor = event.target.result
+                    if (cursor) {
+                        if(cursor.value && cursor.value.filename) {
+                            files.push(new BrowserFile(cursor.value))
+                        }
+                        cursor.continue()
+                    } else {
+                        LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_LOAD_ALL_SUCCESS, { files: files })
+                        return resolve(files)
                     }
-                    cursor.continue()
-                } else {
-                    LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_LOAD_ALL_SUCCESS, {files: files, event: event, request: cursorRequest})
-                    onSuccess(files, {message: MESSAGES.IDB_LOAD_ALL_SUCCESS, event: event, request: cursorRequest})
+                }
+
+                cursorRequest.onerror = function(event) {
+                    LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_ALL_FAIL, { e: event })
+                    return reject({ init: true, dbError: true, error: cursorRequest.error })
                 }
             }
+        })
+    }
 
-            cursorRequest.onerror = function(event) {
-                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_ALL_FAIL, {event: event, request: cursorRequest, errors: {db: true}})
-                onFail({message: MESSAGES.IDB_LOAD_ALL_FAIL, event: event, request: cursorRequest, errors: {db: true}})
+    // Deletes a file if it exists
+    // Even if the file does not exist, returned promise resolves.
+    /**
+     * Deletes a specific file from the inner database.
+     * @param {string} filename - Acts as a unique identifier to find the stored file.
+     * @returns {Promise} - Returns a Promise which resolves once the file is ensured to be deleted. 
+     */
+    delete (filename) {
+        return new Promise((resolve, reject) => {
+            if(!SELF._init) {
+                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, { method: 'delete' })
+                return reject({ init: false })
             }
-        }
 
+            if(!filename || typeof filename !== 'string' || filename.length < 1) {
+                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_BAD_FILENAME, { invalidFilename: true })
+                return reject({ init: true, invalidFilename: true })
+            }
+
+            let transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite")
+            let objectStore = transaction.objectStore("files")
+
+            let deleteRequest = objectStore.delete(filename)
+
+            transaction.oncomplete = function(event) {
+                LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_DELETE_SUCCESS, {})
+                return resolve()
+            }
+        
+            transaction.onerror = function(event) {
+                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_DELETE_FAIL, { e: event })
+                return reject({ init: true, dbError: true, error: transaction.error })
+            }
+        })
     }
 
-    delete (params) {
-        params = params || {}
-        let onSuccess = params.onSuccess || EMPTY_FUNC
-        let onFail = params.onFail || EMPTY_FUNC
-        let filename = params.filename
+    // Delete All will delete all existing saved files within the inner database and within the namespace.
+    /**
+     * Deletes all current files within the inner database on this namespace.
+     * @returns {Promise} - Returns a Promise which resolves if the operation was successful
+     */
+    deleteAll () {
+        return new Promise((resolve, reject) => {
+            if(!SELF._init) {
+                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, { method: 'deleteAll' })
+                return reject({ init: false })
+            }
 
-        if(!SELF._init) {
-            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'delete'})
-            onFail({message: MESSAGES.IDB_NOT_INIT})
-            return
-        }
+            let transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite")
+            let objectStore = transaction.objectStore("files")
 
-        if(!filename || typeof filename !== 'string' || filename.length < 1) {
-            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_BAD_FILENAME, {errors: { filename: true }})
-            onFail({message: MESSAGES.IDB_BAD_FILENAME, errors: { filename: true } })
-            return
-        }
+            let clearRequest = objectStore.clear()
 
-        let transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite")
-        let objectStore = transaction.objectStore("files")
-
-        let deleteRequest = objectStore.delete(filename)
-
-        transaction.oncomplete = function(event) {
-            LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_DELETE_SUCCESS, {event: event, request: deleteRequest, transaction: transaction})
-            onSuccess({message: MESSAGES.IDB_DELETE_SUCCESS, event: event, request: deleteRequest, transaction: transaction})
-        }
-    
-        transaction.onerror = function(event) {
-            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_DELETE_FAIL, {error: transaction.error, event: event, request: deleteRequest})
-            onFail({message: MESSAGES.IDB_DELETE_FAIL, error: transaction.error, event: event, request: deleteRequest})
-        }
-    }
-
-
-    deleteAll (params) {
-        params = params || {}
-        let onSuccess = params.onSuccess || EMPTY_FUNC
-        let onFail = params.onFail || EMPTY_FUNC
-
-        if(!SELF._init) {
-            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, {method: 'delete'})
-            onFail({message: MESSAGES.IDB_NOT_INIT})
-            return
-        }
-
-        let transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite")
-        let objectStore = transaction.objectStore("files")
-
-        let clearRequest = objectStore.clear()
-
-        transaction.oncomplete = function(event) {
-            LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_DELETE_ALL_SUCCESS, {event: event, request: clearRequest})
-            onSuccess({message: MESSAGES.IDB_DELETE_ALL_SUCCESS, event: event, request: clearRequest})
-        };
-    
-        transaction.onerror = function(event) {
-            LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_DELETE_ALL_FAIL, {error: transaction.error, event: event, request: clearRequest})
-            onFail({message: MESSAGES.IDB_DELETE_ALL_FAIL, error: transaction.error, event: event, request: clearRequest})
-        };
+            transaction.oncomplete = function(event) {
+                LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_DELETE_ALL_SUCCESS, {})
+                return resolve()
+            };
+        
+            transaction.onerror = function(event) {
+                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_DELETE_ALL_FAIL, { e: event })
+                return reject({ init: true, dbError: true, error: transaction.error })
+            };
+        })
     }
 
     // Return a File Abstraction
@@ -445,6 +394,56 @@ class BrowserFileStorage {
         })
 
         return fileToSave
+    }
+
+    _opendb (name, callback, version) {
+        let request = null
+        let upgrade = false
+        let initial = false
+        let updateVersions = {old: null, new: null} 
+        if(version) {
+            request = SELF._idb.open(name, version)
+        } else {
+            request = SELF._idb.open(name)
+        }
+
+        request.onerror = (event) => {
+            callback({ error: request.error, event: event, request: request })
+        }
+
+        request.onsuccess = (event) => {
+            SELF._db = request.result
+            callback(null, { db: request.result, request: request, event: event, upgrade: upgrade, initial: initial, versions: updateVersions })
+        };
+
+        request.onupgradeneeded = (event) => {
+            upgrade = true
+            LOGGER.log(LOGGER.LEVEL_WARN, MESSAGES.IDB_WILL_UPGRADE, {})
+
+            SELF._db = event.target.result
+            let transaction = event.target.transaction
+
+            function storeCreateIndex (objectStore, name, options) {
+                if (!objectStore.indexNames.contains(name)) {
+                    objectStore.createIndex(name, name, options);
+                }
+            }
+
+            let filesStore
+            if(event.oldVersion != 0 && event.oldVersion != event.newVersion) {
+                updateVersions.old = event.oldVersion
+                updateVersions.new = event.newVersion
+                // Actual Upgrade
+                filesStore = transaction.objectStore('files')
+            } else {
+                // First time initializing DB
+                initial = true
+                filesStore = SELF._db.createObjectStore("files", { keyPath: "filename" })
+            }
+            
+            storeCreateIndex(filesStore, 'filename', { unique: false } )
+            storeCreateIndex(filesStore, 'modified', { unique: false } )
+        };
     }
 
     _getExtension (string) {

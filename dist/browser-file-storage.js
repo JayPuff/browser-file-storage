@@ -127,8 +127,7 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var EMPTY_FUNC = function EMPTY_FUNC() {};
-var SELF = null;
+var SELF = null; // This messes up if end-user uses arrow functions in some cases...
 
 // *************************** //
 // **** CLASS DECLARATION **** //
@@ -180,8 +179,8 @@ var BrowserFileStorage = function () {
                     var dbName = namespace && typeof namespace === 'string' ? SELF._idb_name + '_' + namespace : SELF._idb_name;
                     SELF._opendb(dbName, function (err, successObj) {
                         if (err) {
-                            _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_COULD_NOT_OPEN, { dbError: true, errorText: err.error, e: err });
-                            return reject({ dbError: true, errorText: err.error, supported: true });
+                            _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_COULD_NOT_OPEN, { dbError: true, error: err.error, e: err });
+                            return reject({ dbError: true, error: err.error, supported: true });
                         }
 
                         SELF._init = true;
@@ -193,57 +192,6 @@ var BrowserFileStorage = function () {
                     return reject({ supported: false });
                 }
             });
-        }
-    }, {
-        key: '_opendb',
-        value: function _opendb(name, callback, version) {
-            var request = null;
-            var upgrade = false;
-            var initial = false;
-            var updateVersions = { old: null, new: null };
-            if (version) {
-                request = SELF._idb.open(name, version);
-            } else {
-                request = SELF._idb.open(name);
-            }
-
-            request.onerror = function (event) {
-                callback({ error: request.error, event: event, request: request });
-            };
-
-            request.onsuccess = function (event) {
-                SELF._db = request.result;
-                callback(null, { db: request.result, request: request, event: event, upgrade: upgrade, initial: initial, versions: updateVersions });
-            };
-
-            request.onupgradeneeded = function (event) {
-                upgrade = true;
-                _logger2.default.log(_logger2.default.LEVEL_WARN, _messages2.default.IDB_WILL_UPGRADE, {});
-
-                SELF._db = event.target.result;
-                var transaction = event.target.transaction;
-
-                function storeCreateIndex(objectStore, name, options) {
-                    if (!objectStore.indexNames.contains(name)) {
-                        objectStore.createIndex(name, name, options);
-                    }
-                }
-
-                var filesStore = void 0;
-                if (event.oldVersion != 0 && event.oldVersion != event.newVersion) {
-                    updateVersions.old = event.oldVersion;
-                    updateVersions.new = event.newVersion;
-                    // Actual Upgrade
-                    filesStore = transaction.objectStore('files');
-                } else {
-                    // First time initializing DB
-                    initial = true;
-                    filesStore = SELF._db.createObjectStore("files", { keyPath: "filename" });
-                }
-
-                storeCreateIndex(filesStore, 'filename', { unique: false });
-                storeCreateIndex(filesStore, 'modified', { unique: false });
-            };
         }
 
         // Persist takes no arguments.
@@ -288,9 +236,9 @@ var BrowserFileStorage = function () {
         /**
          * Saves a file to the database
          * @param {string} filename - Acts as a unique identifier for the stored file, extension may be used to determine mimetype automatically.
-         * @param {string | Blob | SavedFile} contents - raw contents of the file.
+         * @param {string | Blob | BrowserFile} contents - raw contents of the file.
          * @param {string} [mimetype] - Optionally force a mimetype on the saved file, regardless of extension or if a blob already has a mimetype.
-         * @returns {Promise} - Returns a Promise which resolves with the SavedFile object that was saved.  
+         * @returns {Promise} - Returns a Promise which resolves with the BrowserFile object that was saved.  
          */
 
     }, {
@@ -328,17 +276,16 @@ var BrowserFileStorage = function () {
 
                 addRequest.onerror = function (event) {
                     _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_SAVE_FAIL, { e: event });
-                    return reject({ init: true, dbError: true, errorText: transaction.error });
+                    return reject({ init: true, dbError: true, error: addRequest.error });
                 };
             });
         }
 
-        // Load will access the inner database
-        // @TODO: Allow array of files to be loaded? needs to rework internals for that! how to know what resolved? what if only one file didn't load.?
+        // Load will access the inner database and fetch the file as a BrowserFile object
         /**
-         * Saves a file to the database
+         * Loads a file from the database.
          * @param {string} filename - Acts as a unique identifier for the stored file
-         * @returns {Promise} - Returns a Promise which resolves if the file is loaded properly with the SavedFile object. 
+         * @returns {Promise} - Returns a Promise which resolves if the file is loaded properly with the BrowserFile object. 
          */
 
     }, {
@@ -373,140 +320,149 @@ var BrowserFileStorage = function () {
 
                 request.onerror = function (event) {
                     _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_FAIL, { e: event });
-                    return reject({ init: true, dbError: true, errorText: transaction.error });
+                    return reject({ init: true, dbError: true, error: request.error });
                 };
             });
         }
 
-        // onSuccess, onFail
+        // Load All will load all existing saved files into an array of BrowserFile
+        /**
+         * Returns all currently saved files 
+         * @returns {Promise} - Returns a Promise which resolves with an array containing all saved files.
+         */
 
     }, {
         key: 'loadAll',
-        value: function loadAll(params) {
-            params = params || {};
-            var onSuccess = params.onSuccess || EMPTY_FUNC;
-            var onFail = params.onFail || EMPTY_FUNC;
+        value: function loadAll() {
+            return new Promise(function (resolve, reject) {
+                if (!SELF._init) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'loadAll' });
+                    return reject({ init: false });
+                }
 
-            if (!SELF._init) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'loadAll' });
-                onFail({ message: _messages2.default.IDB_NOT_INIT });
-                return;
-            }
+                var transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite");
+                var objectStore = transaction.objectStore("files");
 
-            var transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite");
-            var objectStore = transaction.objectStore("files");
+                if (objectStore.getAll) {
+                    // Parameters for getAll (query, maxToReturnIfOver1)
+                    var getRequest = objectStore.getAll();
 
-            if (objectStore.getAll) {
-                // Parameters for getAll (query, maxToReturnIfOver1)
-                var getRequest = objectStore.getAll();
-
-                getRequest.onsuccess = function (event) {
-                    var files = [];
-                    if (!event.target.result[0]) {
-                        if (event.target.result && event.target.result.filename) {
-                            files.push(new _file2.default(event.target.result));
-                        }
-                    } else {
-                        for (var r in event.target.result) {
-                            if (event.target.result[r] && event.target.result[r].filename) {
-                                files.push(new _file2.default(event.target.result[r]));
+                    getRequest.onsuccess = function (event) {
+                        var files = [];
+                        if (!event.target.result[0]) {
+                            if (event.target.result && event.target.result.filename) {
+                                files.push(new _file2.default(event.target.result));
+                            }
+                        } else {
+                            for (var r in event.target.result) {
+                                if (event.target.result[r] && event.target.result[r].filename) {
+                                    files.push(new _file2.default(event.target.result[r]));
+                                }
                             }
                         }
-                    }
-                    _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_LOAD_ALL_SUCCESS, { files: files, event: event, request: getRequest });
-                    onSuccess(files, { message: _messages2.default.IDB_LOAD_ALL_SUCCESS, event: event, request: getRequest });
-                };
+                        _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_LOAD_ALL_SUCCESS, { files: files });
+                        return resolve(files);
+                    };
 
-                getRequest.onerror = function (event) {
-                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_ALL_FAIL, { event: event, request: getRequest, errors: { db: true } });
-                    onFail({ message: _messages2.default.IDB_LOAD_ALL_FAIL, event: event, request: getRequest, errors: { db: true } });
-                };
-            } else {
-                // Fallback to the traditional cursor approach if getAll isn't supported.
-                var files = [];
-                var cursorRequest = objectStore.openCursor();
+                    getRequest.onerror = function (event) {
+                        _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_ALL_FAIL, { e: event });
+                        return reject({ init: true, dbError: true, error: getRequest.error });
+                    };
+                } else {
+                    // Fallback to the traditional cursor approach if getAll isn't supported.
+                    var files = [];
+                    var cursorRequest = objectStore.openCursor();
 
-                cursorRequest.onsuccess = function (event) {
-                    var cursor = event.target.result;
-                    if (cursor) {
-                        if (cursor.value && cursor.value.filename) {
-                            files.push(new _file2.default(cursor.value));
+                    cursorRequest.onsuccess = function (event) {
+                        var cursor = event.target.result;
+                        if (cursor) {
+                            if (cursor.value && cursor.value.filename) {
+                                files.push(new _file2.default(cursor.value));
+                            }
+                            cursor.continue();
+                        } else {
+                            _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_LOAD_ALL_SUCCESS, { files: files });
+                            return resolve(files);
                         }
-                        cursor.continue();
-                    } else {
-                        _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_LOAD_ALL_SUCCESS, { files: files, event: event, request: cursorRequest });
-                        onSuccess(files, { message: _messages2.default.IDB_LOAD_ALL_SUCCESS, event: event, request: cursorRequest });
-                    }
-                };
+                    };
 
-                cursorRequest.onerror = function (event) {
-                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_ALL_FAIL, { event: event, request: cursorRequest, errors: { db: true } });
-                    onFail({ message: _messages2.default.IDB_LOAD_ALL_FAIL, event: event, request: cursorRequest, errors: { db: true } });
-                };
-            }
+                    cursorRequest.onerror = function (event) {
+                        _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_ALL_FAIL, { e: event });
+                        return reject({ init: true, dbError: true, error: cursorRequest.error });
+                    };
+                }
+            });
         }
+
+        // Deletes a file if it exists
+        // Even if the file does not exist, returned promise resolves.
+        /**
+         * Deletes a specific file from the inner database.
+         * @param {string} filename - Acts as a unique identifier to find the stored file.
+         * @returns {Promise} - Returns a Promise which resolves once the file is ensured to be deleted. 
+         */
+
     }, {
         key: 'delete',
-        value: function _delete(params) {
-            params = params || {};
-            var onSuccess = params.onSuccess || EMPTY_FUNC;
-            var onFail = params.onFail || EMPTY_FUNC;
-            var filename = params.filename;
+        value: function _delete(filename) {
+            return new Promise(function (resolve, reject) {
+                if (!SELF._init) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'delete' });
+                    return reject({ init: false });
+                }
 
-            if (!SELF._init) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'delete' });
-                onFail({ message: _messages2.default.IDB_NOT_INIT });
-                return;
-            }
+                if (!filename || typeof filename !== 'string' || filename.length < 1) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_BAD_FILENAME, { invalidFilename: true });
+                    return reject({ init: true, invalidFilename: true });
+                }
 
-            if (!filename || typeof filename !== 'string' || filename.length < 1) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_BAD_FILENAME, { errors: { filename: true } });
-                onFail({ message: _messages2.default.IDB_BAD_FILENAME, errors: { filename: true } });
-                return;
-            }
+                var transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite");
+                var objectStore = transaction.objectStore("files");
 
-            var transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite");
-            var objectStore = transaction.objectStore("files");
+                var deleteRequest = objectStore.delete(filename);
 
-            var deleteRequest = objectStore.delete(filename);
+                transaction.oncomplete = function (event) {
+                    _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_DELETE_SUCCESS, {});
+                    return resolve();
+                };
 
-            transaction.oncomplete = function (event) {
-                _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_DELETE_SUCCESS, { event: event, request: deleteRequest, transaction: transaction });
-                onSuccess({ message: _messages2.default.IDB_DELETE_SUCCESS, event: event, request: deleteRequest, transaction: transaction });
-            };
-
-            transaction.onerror = function (event) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_DELETE_FAIL, { error: transaction.error, event: event, request: deleteRequest });
-                onFail({ message: _messages2.default.IDB_DELETE_FAIL, error: transaction.error, event: event, request: deleteRequest });
-            };
+                transaction.onerror = function (event) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_DELETE_FAIL, { e: event });
+                    return reject({ init: true, dbError: true, error: transaction.error });
+                };
+            });
         }
+
+        // Delete All will delete all existing saved files within the inner database and within the namespace.
+        /**
+         * Deletes all current files within the inner database on this namespace.
+         * @returns {Promise} - Returns a Promise which resolves if the operation was successful
+         */
+
     }, {
         key: 'deleteAll',
-        value: function deleteAll(params) {
-            params = params || {};
-            var onSuccess = params.onSuccess || EMPTY_FUNC;
-            var onFail = params.onFail || EMPTY_FUNC;
+        value: function deleteAll() {
+            return new Promise(function (resolve, reject) {
+                if (!SELF._init) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'deleteAll' });
+                    return reject({ init: false });
+                }
 
-            if (!SELF._init) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'delete' });
-                onFail({ message: _messages2.default.IDB_NOT_INIT });
-                return;
-            }
+                var transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite");
+                var objectStore = transaction.objectStore("files");
 
-            var transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite");
-            var objectStore = transaction.objectStore("files");
+                var clearRequest = objectStore.clear();
 
-            var clearRequest = objectStore.clear();
+                transaction.oncomplete = function (event) {
+                    _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_DELETE_ALL_SUCCESS, {});
+                    return resolve();
+                };
 
-            transaction.oncomplete = function (event) {
-                _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_DELETE_ALL_SUCCESS, { event: event, request: clearRequest });
-                onSuccess({ message: _messages2.default.IDB_DELETE_ALL_SUCCESS, event: event, request: clearRequest });
-            };
-
-            transaction.onerror = function (event) {
-                _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_DELETE_ALL_FAIL, { error: transaction.error, event: event, request: clearRequest });
-                onFail({ message: _messages2.default.IDB_DELETE_ALL_FAIL, error: transaction.error, event: event, request: clearRequest });
-            };
+                transaction.onerror = function (event) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_DELETE_ALL_FAIL, { e: event });
+                    return reject({ init: true, dbError: true, error: transaction.error });
+                };
+            });
         }
 
         // Return a File Abstraction
@@ -586,10 +542,62 @@ var BrowserFileStorage = function () {
                 blob: newBlob,
                 lastModified: new Date().getTime(),
                 extension: ext,
-                size: newBlob.size
+                size: newBlob.size,
+                type: newBlob.type
             });
 
             return fileToSave;
+        }
+    }, {
+        key: '_opendb',
+        value: function _opendb(name, callback, version) {
+            var request = null;
+            var upgrade = false;
+            var initial = false;
+            var updateVersions = { old: null, new: null };
+            if (version) {
+                request = SELF._idb.open(name, version);
+            } else {
+                request = SELF._idb.open(name);
+            }
+
+            request.onerror = function (event) {
+                callback({ error: request.error, event: event, request: request });
+            };
+
+            request.onsuccess = function (event) {
+                SELF._db = request.result;
+                callback(null, { db: request.result, request: request, event: event, upgrade: upgrade, initial: initial, versions: updateVersions });
+            };
+
+            request.onupgradeneeded = function (event) {
+                upgrade = true;
+                _logger2.default.log(_logger2.default.LEVEL_WARN, _messages2.default.IDB_WILL_UPGRADE, {});
+
+                SELF._db = event.target.result;
+                var transaction = event.target.transaction;
+
+                function storeCreateIndex(objectStore, name, options) {
+                    if (!objectStore.indexNames.contains(name)) {
+                        objectStore.createIndex(name, name, options);
+                    }
+                }
+
+                var filesStore = void 0;
+                if (event.oldVersion != 0 && event.oldVersion != event.newVersion) {
+                    updateVersions.old = event.oldVersion;
+                    updateVersions.new = event.newVersion;
+                    // Actual Upgrade
+                    filesStore = transaction.objectStore('files');
+                } else {
+                    // First time initializing DB
+                    initial = true;
+                    filesStore = SELF._db.createObjectStore("files", { keyPath: "filename" });
+                }
+
+                storeCreateIndex(filesStore, 'filename', { unique: false });
+                storeCreateIndex(filesStore, 'modified', { unique: false });
+            };
         }
     }, {
         key: '_getExtension',
@@ -822,18 +830,19 @@ var _createClass = function () { function defineProperties(target, props) { for 
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
-var SavedFile = function () {
-    function SavedFile(props) {
-        _classCallCheck(this, SavedFile);
+var BrowserFile = function () {
+    function BrowserFile(props) {
+        _classCallCheck(this, BrowserFile);
 
         this.filename = props.filename;
         this.lastModified = props.lastModified;
         this.blob = props.blob;
         this.extension = props.extension;
         this.size = props.size;
+        this.type = props.type;
     }
 
-    _createClass(SavedFile, [{
+    _createClass(BrowserFile, [{
         key: '_toIDB',
         value: function _toIDB() {
             return {
@@ -841,7 +850,8 @@ var SavedFile = function () {
                 lastModified: this.lastModified,
                 blob: this.blob,
                 extension: this.extension,
-                size: this.size
+                size: this.size,
+                type: this.type
             };
         }
     }, {
@@ -910,10 +920,10 @@ var SavedFile = function () {
         }
     }]);
 
-    return SavedFile;
+    return BrowserFile;
 }();
 
-exports.default = SavedFile;
+exports.default = BrowserFile;
 
 /***/ })
 /******/ ]);
