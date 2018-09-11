@@ -27,6 +27,15 @@ Importing through script tag
 
 # Usage
 
+## Logging
+
+By default browserFileStorage will only log errors, if you want to see logs in more detail you can change the mode.
+
+```javascript
+// Levels are 'info', 'warn', 'error' and 'none'
+browserFileStorage.logLevel('info')
+```
+
 ## Initialization
 
 Before using browserFileStorage, it is important to initialize the instance.
