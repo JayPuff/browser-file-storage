@@ -1,14 +1,15 @@
 - test all readme cases with function() rather than () => to make sure they work well
-- test actual use cases and document ... uploading a file using blob, downloading a file, .. all that we want implemented basically.
-- document file.js
-- finish save definition on what contents can be, and fix on read me when done.. (File (form)? js obj (and json parse... ugh.)? dataurl string? url?)
+- if contents is js obj... try to stringify and store as text??
 - load -> array of filenames, and document
 - delete -> array of filenames and document ? (not really important...)
-- Simple demo in a folder (not the webpack one im using...)
 
-- md5 hash?
+- md5 hash? // seems too specific... 
 - jsdoc not working with webpack??? if I put everything in one file and remove webpack will it work?
 - read me
+
+- file create url cached per instance but not filename..
+
+- DEMO n reddit
 
 
 
