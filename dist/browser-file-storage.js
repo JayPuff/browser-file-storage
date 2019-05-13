@@ -105,6 +105,8 @@ Object.defineProperty(exports, "__esModule", {
     value: true
 });
 
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
 var _messages = __webpack_require__(1);
@@ -238,12 +240,13 @@ var BrowserFileStorage = function () {
          * @param {string} filename - Acts as a unique identifier for the stored file, extension may be used to determine mimetype automatically.
          * @param {string | Blob | BrowserFile} contents - raw contents of the file.
          * @param {string} [mimetype] - Optionally force a mimetype on the saved file, regardless of extension or if a blob already has a mimetype.
+         * @param {Object} [metadata] - Optionally send a JS object to store as metadata for this file.
          * @returns {Promise} - Returns a Promise which resolves with the BrowserFile object that was saved.  
          */
 
     }, {
         key: 'save',
-        value: function save(filename, contents, mimetype) {
+        value: function save(filename, contents, mimetype, metadata) {
             return new Promise(function (resolve, reject) {
                 // Validation and Blob Creation.
                 if (!SELF._init) {
@@ -256,7 +259,7 @@ var BrowserFileStorage = function () {
                     return reject({ init: true, invalidFilename: true });
                 }
 
-                var fileToSave = SELF._createFileToSave({ filename: filename, contents: contents, mimeType: mimetype });
+                var fileToSave = SELF._createFileToSave({ filename: filename, contents: contents, mimeType: mimetype, metadata: metadata });
 
                 if (!fileToSave) {
                     _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_WRONG_CONTENT, { invalidContents: true });
@@ -472,7 +475,8 @@ var BrowserFileStorage = function () {
         value: function _createFileToSave(_ref) {
             var filename = _ref.filename,
                 contents = _ref.contents,
-                mimeType = _ref.mimeType;
+                mimeType = _ref.mimeType,
+                metadata = _ref.metadata;
 
             if (!mimeType || typeof mimeType !== 'string' || mimeType == '') {
                 mimeType = null;
@@ -537,13 +541,23 @@ var BrowserFileStorage = function () {
                 return null;
             }
 
+            var validMetadataObj = {};
+            try {
+                if (metadata && (typeof metadata === 'undefined' ? 'undefined' : _typeof(metadata)) === 'object') {
+                    validMetadataObj = JSON.parse(JSON.stringify(metadata));
+                }
+            } catch (error) {
+                validMetadataObj = {};
+            }
+
             var fileToSave = new _file2.default({
                 filename: filename,
                 blob: newBlob,
                 lastModified: new Date().getTime(),
                 extension: ext,
                 size: newBlob.size,
-                type: newBlob.type
+                type: newBlob.type,
+                metadata: validMetadataObj
             });
 
             return fileToSave;
@@ -840,6 +854,7 @@ var BrowserFile = function () {
         this.extension = props.extension;
         this.size = props.size;
         this.type = props.type;
+        this.metadata = props.metadata;
     }
 
     _createClass(BrowserFile, [{
@@ -851,7 +866,8 @@ var BrowserFile = function () {
                 blob: this.blob,
                 extension: this.extension,
                 size: this.size,
-                type: this.type
+                type: this.type,
+                metadata: this.metadata
             };
         }
     }, {
