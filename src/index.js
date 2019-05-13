@@ -107,9 +107,10 @@ class BrowserFileStorage {
      * @param {string} filename - Acts as a unique identifier for the stored file, extension may be used to determine mimetype automatically.
      * @param {string | Blob | BrowserFile} contents - raw contents of the file.
      * @param {string} [mimetype] - Optionally force a mimetype on the saved file, regardless of extension or if a blob already has a mimetype.
+     * @param {Object} [metadata] - Optionally send a JS object to store as metadata for this file.
      * @returns {Promise} - Returns a Promise which resolves with the BrowserFile object that was saved.  
      */
-    save (filename, contents, mimetype) {
+    save (filename, contents, mimetype, metadata) {
         return new Promise((resolve, reject) => {
             // Validation and Blob Creation.
             if(!SELF._init) {
@@ -122,7 +123,7 @@ class BrowserFileStorage {
                 return reject({ init: true, invalidFilename: true })
             }
 
-            let fileToSave = SELF._createFileToSave({ filename: filename, contents: contents, mimeType: mimetype })
+            let fileToSave = SELF._createFileToSave({ filename: filename, contents: contents, mimeType: mimetype, metadata: metadata })
 
             if(!fileToSave) {
                 LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_WRONG_CONTENT, { invalidContents: true })
@@ -320,7 +321,7 @@ class BrowserFileStorage {
     }
 
     // Return a File Abstraction
-    _createFileToSave ({filename, contents, mimeType}) {
+    _createFileToSave ({filename, contents, mimeType, metadata}) {
         if(!mimeType || typeof mimeType !== 'string' || mimeType == '') {
             mimeType = null
         }
@@ -384,13 +385,23 @@ class BrowserFileStorage {
             return null
         }
 
+        let validMetadataObj = {};
+        try {
+            if(metadata && typeof metadata === 'object') {
+                validMetadataObj = JSON.parse(JSON.stringify(metadata))
+            }
+        } catch (error) {
+            validMetadataObj = {};
+        }
+
         let fileToSave = new BrowserFile({
             filename: filename,
             blob: newBlob,
             lastModified: (new Date()).getTime(),
             extension: ext,
             size: newBlob.size,
-            type: newBlob.type
+            type: newBlob.type,
+            metadata: validMetadataObj
         })
 
         return fileToSave

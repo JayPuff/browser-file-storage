@@ -160,6 +160,12 @@ Since there are LOTS of mimetypes, we only detect some of the most common types,
 
 If you want to make sure your file is saved with the proper mimetype, so that when it is loaded again it can be read by the browser as you want it to, simply pass a third parameter to the save function with the mimetype; This will force the internal blob to that type **Even if the blob was already typed**
 
+### File metadata
+
+In case you want to store any sort of metadata for the file, you can use an optional 4th parameter after mimetype when using the save function (You can leave mimetype as null if you are using auto-assigned mimetype)
+
+Metadata is expected to be a simple JS object.
+
 ### More Specific Examples
 
 [Some specific save examples of different scenarios](#specific-save)
@@ -177,6 +183,7 @@ console.log(file.lastModified) // JS timestamp when it was last saved/overwritte
 console.log(file.size) // Size recorded when last stored.
 console.log(file.blob) // Blob Object, this can be turned into a local URL, sent via xhr, etc. This is the actual `file`
 console.log(file.type) // Mimetype
+console.log(file.metadata) // Metadata JS Object
 
 // Create a local URL for the resource. It will return the same url no matter how many times you called unless destroyed.
 let url = file.createURL()

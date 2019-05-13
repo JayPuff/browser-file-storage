@@ -9,6 +9,7 @@ class BrowserFile {
         this.extension = props.extension
         this.size = props.size
         this.type = props.type
+        this.metadata = props.metadata
     }
 
     _toIDB () {
@@ -18,7 +19,8 @@ class BrowserFile {
             blob: this.blob,
             extension: this.extension,
             size: this.size,
-            type: this.type
+            type: this.type,
+            metadata: this.metadata
         }
     }
 
