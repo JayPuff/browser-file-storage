@@ -40,7 +40,7 @@ browserFileStorage.logLevel('info')
 
 Before using browserFileStorage, it is important to initialize the instance.
 Although a namespace parameter is not needed, it is safer to namespace the instance with the name of your app.
-The app name will be appended to the inner database name and create a unique identifier in case another library within the same domain, also uses this same library.
+The app name will be appended to the inner database name and create a unique identifier in case another library within the same domain, also uses indexedDB internally.
 
 The same namespace will have to be used always when running *init* as it will re open the same inner database. 
 
@@ -160,11 +160,36 @@ Since there are LOTS of mimetypes, we only detect some of the most common types,
 
 If you want to make sure your file is saved with the proper mimetype, so that when it is loaded again it can be read by the browser as you want it to, simply pass a third parameter to the save function with the mimetype; This will force the internal blob to that type **Even if the blob was already typed**
 
+```javascript
+// Some settings JS object.
+const data = { preferences: { notifications: "off" } }
+const json = JSON.stringify(data)
+
+browserFileStorage.save('settings.json', json, 'application/json' ).then((file) => {
+    // ...
+}).catch((error) => {
+    // ....
+})
+```
+
+
 ### File metadata
 
 In case you want to store any sort of metadata for the file, you can use an optional 4th parameter after mimetype when using the save function (You can leave mimetype as null if you are using auto-assigned mimetype)
 
 Metadata is expected to be a simple JS object.
+
+```javascript
+// Some settings JS object.
+const data = { preferences: { notifications: "off" } }
+const json = JSON.stringify(data)
+
+browserFileStorage.save('settings.json', json, null, { md5: 'some hash' }).then((file) => {
+    // ...
+}).catch((error) => {
+    // ....
+})
+```
 
 ### More Specific Examples
 
