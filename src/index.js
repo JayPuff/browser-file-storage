@@ -255,6 +255,61 @@ class BrowserFileStorage {
         })
     }
 
+
+    // lists all filenames without loading the actual files from storage
+    /**
+     * Returns all current keys/filenames to files stored 
+     * @returns {Promise} - Returns a Promise which resolves with an array containing all current keys/filenames for files stored
+     */
+    list () {
+        return new Promise((resolve, reject) => {
+            if(!SELF._init) {
+                LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_NOT_INIT, { method: 'list' })
+                return reject({ init: false })
+            }
+
+            let transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite")
+            let objectStore = transaction.objectStore("files")
+
+            if(objectStore.getAllKeys) {
+                // Parameters for getAll (query, maxToReturnIfOver1)
+                let getRequest = objectStore.getAllKeys()
+                
+                getRequest.onsuccess = function(event) {
+                    LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_LOAD_ALL_KEYS_SUCCESS, { keys: event.target.result })
+                    return resolve(event.target.result)
+                }
+
+                getRequest.onerror = function(event) {
+                    LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_ALL_KEYS_FAIL, { e: event })
+                    return reject({ init: true, dbError: true, error: getRequest.error })
+                }
+            } else {
+                // Fallback to the traditional cursor approach if getAll isn't supported.
+                let filenames = []
+                let cursorRequest = objectStore.openCursor()
+                
+                cursorRequest.onsuccess = function(event) {
+                    let cursor = event.target.result
+                    if (cursor) {
+                        if(cursor.key) {
+                            filenames.push(cursor.key)
+                        }
+                        cursor.continue()
+                    } else {
+                        LOGGER.log(LOGGER.LEVEL_INFO, MESSAGES.IDB_LOAD_ALL_KEYS_SUCCESS, { keys: filenames })
+                        return resolve(filenames)
+                    }
+                }
+
+                cursorRequest.onerror = function(event) {
+                    LOGGER.log(LOGGER.LEVEL_ERROR, MESSAGES.IDB_LOAD_ALL_KEYS_FAIL, { e: event })
+                    return reject({ init: true, dbError: true, error: cursorRequest.error })
+                }
+            }
+        })
+    }
+
     // Deletes a file if it exists
     // Even if the file does not exist, returned promise resolves.
     /**

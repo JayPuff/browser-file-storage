@@ -323,6 +323,30 @@ browserFileStorage.loadAll().then((files) => {
 })
 ```
 
+## Listing all filenames / keys
+
+If you want to get a list of all filenames or keys (Ex: in order to delete some of them)
+
+### Basic Example
+```javascript
+browserFileStorage.list().then((filenames) => {
+    for(let f in filenames) {
+        console.log('Use this key to delete or load a file: ', filenames[f])
+    }
+}).catch((error) => {
+    if(!error.init) {
+        // ... browserFileStorage was not initialized yet.
+    }
+
+    if(error.dbError) {
+        // ... Internal IndexedDB error! Oh no! Failed to load all keys.
+
+        // ... What was the problem exactly? (Error Object)
+        console.error(error.error)
+    }
+})
+```
+
 ## Deleting a file
 
 Delete takes a filename and resolves once the file is no longer there. It will resolve regardless of if the file existed in the first place or not.

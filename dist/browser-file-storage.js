@@ -397,6 +397,63 @@ var BrowserFileStorage = function () {
             });
         }
 
+        // lists all filenames without loading the actual files from storage
+        /**
+         * Returns all current keys/filenames to files stored 
+         * @returns {Promise} - Returns a Promise which resolves with an array containing all current keys/filenames for files stored
+         */
+
+    }, {
+        key: 'list',
+        value: function list() {
+            return new Promise(function (resolve, reject) {
+                if (!SELF._init) {
+                    _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_NOT_INIT, { method: 'list' });
+                    return reject({ init: false });
+                }
+
+                var transaction = SELF._db.transaction(["files"], IDBTransaction.READ_WRITE || "readwrite");
+                var objectStore = transaction.objectStore("files");
+
+                if (objectStore.getAllKeys) {
+                    // Parameters for getAll (query, maxToReturnIfOver1)
+                    var getRequest = objectStore.getAllKeys();
+
+                    getRequest.onsuccess = function (event) {
+                        _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_LOAD_ALL_KEYS_SUCCESS, { keys: event.target.result });
+                        return resolve(event.target.result);
+                    };
+
+                    getRequest.onerror = function (event) {
+                        _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_ALL_KEYS_FAIL, { e: event });
+                        return reject({ init: true, dbError: true, error: getRequest.error });
+                    };
+                } else {
+                    // Fallback to the traditional cursor approach if getAll isn't supported.
+                    var filenames = [];
+                    var cursorRequest = objectStore.openCursor();
+
+                    cursorRequest.onsuccess = function (event) {
+                        var cursor = event.target.result;
+                        if (cursor) {
+                            if (cursor.key) {
+                                filenames.push(cursor.key);
+                            }
+                            cursor.continue();
+                        } else {
+                            _logger2.default.log(_logger2.default.LEVEL_INFO, _messages2.default.IDB_LOAD_ALL_KEYS_SUCCESS, { keys: filenames });
+                            return resolve(filenames);
+                        }
+                    };
+
+                    cursorRequest.onerror = function (event) {
+                        _logger2.default.log(_logger2.default.LEVEL_ERROR, _messages2.default.IDB_LOAD_ALL_KEYS_FAIL, { e: event });
+                        return reject({ init: true, dbError: true, error: cursorRequest.error });
+                    };
+                }
+            });
+        }
+
         // Deletes a file if it exists
         // Even if the file does not exist, returned promise resolves.
         /**
@@ -689,6 +746,9 @@ exports.default = {
 
     IDB_LOAD_ALL_SUCCESS: "Successfully loaded all files from database.",
     IDB_LOAD_ALL_FAIL: "Could not load all files from the database.",
+
+    IDB_LOAD_ALL_KEYS_SUCCESS: "Successfully loaded all keys/filenames from database.",
+    IDB_LOAD_ALL_KEYS_FAIL: "Could not load all keys/filenames from the database.",
 
     IDB_DELETE_SUCCESS: "Successfully deleted a file from database.",
     IDB_DELETE_FAIL: "Failed at deleting file from database.",
