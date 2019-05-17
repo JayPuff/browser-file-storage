@@ -513,3 +513,18 @@ fileInput.addEventListener('change', (e) => {
     }
 })
 ```
+
+
+## Getting file hashes to know if file needs to be updated
+
+While I decided not to implement something like this in the base library, you can use libraries such as CryptoJS to get hashes from a browserFileStorage file.
+
+```javascript
+let loadedFile = // Load a file using browserStorage...
+loadedFile.toArrayBuffer().then((arrayBuffer) => {
+    let wordArray = window.CryptoJS.lib.WordArray.create(arrayBuffer)
+    let hash = window.CryptoJS.MD5(wordArray).toString())
+    console.log(hash)
+})
+
+```
